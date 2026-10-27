@@ -14,7 +14,8 @@ service:
   port: 8080
 
 ingress:
-  enabled: true
+  # 끔 (2026-10-27): 공유기가 80/443 을 traefik 으로 넘겨 host 없는 Ingress 가 공인 IP 로 노출됐다
+  enabled: false
   # k3s 기본 Ingress 컨트롤러
   className: traefik
   # 비우면 모든 호스트 이름을 받는다 (http://<노드 IP>/). 이름으로 가르려면 넣는다 (예: moneylog.home)
