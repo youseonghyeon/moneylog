@@ -58,9 +58,11 @@ export interface Deposit {
 
 export type DepositInput = Omit<Deposit, "id">;
 
-export type BalanceKind = "stock" | "saving" | "loan";
+/** 주식 · 적금 · 보증금(월세·전세) · 대출 */
+export type BalanceKind = "stock" | "saving" | "deposit" | "loan";
+export const BALANCE_KINDS: BalanceKind[] = ["stock", "saving", "deposit", "loan"];
 
-/** 주식·적금·대출 잔액. 추적 없이 지금 얼마인지만 (대출은 남은 원금) */
+/** 주식·적금·보증금·대출 잔액. 추적 없이 지금 얼마인지만 (대출은 남은 원금) */
 export interface Balance {
   id: number;
   kind: BalanceKind;

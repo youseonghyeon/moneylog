@@ -1,7 +1,7 @@
 // API 입력 검사. 실패 문구는 화면에 그대로 보이므로 "무엇이 잘못됐고 어떻게 고치나" 를 담는다.
 import { isDate, isLabel } from "./period.ts";
-import { SPEND_CATEGORIES } from "./types.ts";
-import type { BalanceInput, DepositInput, ItemInput, SpendCategory, SpendInput } from "./types.ts";
+import { BALANCE_KINDS, SPEND_CATEGORIES } from "./types.ts";
+import type { BalanceInput, BalanceKind, DepositInput, ItemInput, SpendCategory, SpendInput } from "./types.ts";
 
 export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -76,12 +76,12 @@ export function checkDeposit(body: unknown): Checked<DepositInput> {
 export function checkBalance(body: unknown): Checked<BalanceInput> {
   if (typeof body !== "object" || body === null) return fail("요청 본문이 JSON 객체가 아닙니다.");
   const b = body as Record<string, unknown>;
-  if (b.kind !== "stock" && b.kind !== "saving" && b.kind !== "loan") return fail("종류는 주식·적금·대출 중에서 골라 주세요.");
+  if (!BALANCE_KINDS.includes(b.kind as BalanceKind)) return fail("종류는 stock(주식)·saving(적금)·deposit(보증금)·loan(대출) 중에서 골라 주세요.");
   const name = checkName(b.name);
   if (!name.ok) return name;
   const amount = checkAmount(b.amount);
   if (!amount.ok) return amount;
-  return { ok: true, value: { kind: b.kind, name: name.value, amount: amount.value, memo: memoOf(b.memo) } };
+  return { ok: true, value: { kind: b.kind as BalanceKind, name: name.value, amount: amount.value, memo: memoOf(b.memo) } };
 }
 
 export function checkSpend(body: unknown): Checked<SpendInput> {

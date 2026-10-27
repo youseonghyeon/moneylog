@@ -69,6 +69,7 @@ try {
   await post("POST", "/api/balances", { kind: "stock", name: "토스증권", amount: 3200000 });
   await post("POST", "/api/balances", { kind: "loan", name: "전세대출", amount: 120000000 });
   await post("POST", "/api/balances", { kind: "saving", name: "청년미래적금", amount: 1500000, memo: "2027-06 만기" });
+  await post("POST", "/api/balances", { kind: "deposit", name: "월세 보증금", amount: 14000000 });
   await post("PUT", `/api/budget/${ym}`, { amount: 600000 });
   const sp = (date, time, amount, category, merchant, ref) => post("POST", "/api/spends", { date, time, amount, category, merchant, source: "신한카드 신용", ref });
   await sp(today, "12:05", 9600, "식비", "왓더버거", "t1");
@@ -184,11 +185,11 @@ try {
   await page.getByRole("tab", { name: "잔액" }).click();
   check(page.url().endsWith("#balance"), "잔액 탭 주소 #balance");
   check(
-    (await page.locator(".summary .kv").allInnerTexts()).join("|").replace(/\s+/g, " ") === "주식 3,200,000원|적금 1,500,000원|대출 120,000,000원",
-    "잔액 탭 요약: 종류별 합계",
+    (await page.locator(".summary .kv").allInnerTexts()).join("|").replace(/\s+/g, " ") === "주식 3,200,000원|적금 1,500,000원|보증금 14,000,000원|대출 120,000,000원",
+    "잔액 탭 요약: 종류별 합계 (보증금 포함)",
   );
-  const bal = acct("주식·적금·대출");
-  check((await bal.locator(".kind h3").count()) === 3, "잔액은 주식·적금·대출로 묶인다");
+  const bal = acct("주식·적금·보증금·대출");
+  check((await bal.locator(".kind h3").count()) === 4, "잔액은 주식·적금·보증금·대출로 묶인다");
   check((await bal.locator(".kind").nth(1).locator("small").innerText()).includes("2027-06 만기 ·"), "잔액 메모·기준일");
   await page.screenshot({ path: `${OUT}/07-balance-mobile.png`, fullPage: true });
   await page.getByRole("tab", { name: "예정" }).click();

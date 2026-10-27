@@ -139,7 +139,7 @@ export function createApp(db: Db, today: () => string = localToday): Hono {
     return c.body(null, 204);
   });
 
-  // 주식·적금·대출 잔액
+  // 주식·적금·보증금·대출 잔액
   app.get("/api/balances", (c) => c.json(store.listBalances(db)));
 
   app.post("/api/balances", async (c) => {

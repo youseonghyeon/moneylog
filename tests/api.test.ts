@@ -170,7 +170,8 @@ describe("API", () => {
     const changed = await call("PUT", `/api/balances/${c.json.id}`, { kind: "stock", name: "토스증권 ISA", amount: 3_050_000 });
     expect(changed.json).toMatchObject({ amount: 3_050_000, updatedAt: "2026-11-03" });
     await call("POST", "/api/balances", { kind: "loan", name: "전세대출", amount: 120_000_000 });
-    expect((await call("GET", "/api/balances")).json.map((b: { kind: string }) => b.kind)).toEqual(["stock", "loan"]);
+    await call("POST", "/api/balances", { kind: "deposit", name: "월세 보증금", amount: 14_000_000 });
+    expect((await call("GET", "/api/balances")).json.map((b: { kind: string }) => b.kind)).toEqual(["stock", "loan", "deposit"]);
     expect((await call("POST", "/api/balances", { kind: "cash", name: "a", amount: 1 })).json.error).toMatch(/종류/);
     expect((await call("POST", "/api/balances", { kind: "saving", name: "", amount: 1 })).json.error).toMatch(/이름/);
     expect((await call("DELETE", `/api/balances/${c.json.id}`)).status).toBe(204);

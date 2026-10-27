@@ -1,9 +1,10 @@
 // 한 화면, 탭 셋. 보기 전용 — 입력은 사용자 대신 에이전트가 API 로 넣는다(사용자 결정 2026-10-27).
 // 예정: 계좌별 입금 필요 금액 · 날짜별로 빠져나갈 돈과 남은 금액(마지막에 0원). 생활비 항목·입금·잔액은 안 보인다
-// 생활비: 그 기간 생활비 거래 — 분류별 · 달력 / 잔액: 주식·적금·대출
+// 생활비: 그 기간 생활비 거래 — 분류별 · 달력 / 잔액: 주식·적금·보증금·대출
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { labelOf, shiftLabel } from "../core/period.ts";
+import { BALANCE_KINDS } from "../core/types.ts";
 import type { Balance, Plan, PlanLine, Settings, Spend } from "../core/types.ts";
 import { api } from "./api.ts";
 import { dateText, KIND_NAMES, labelText, shortDate, todayStr, won } from "./format.ts";
@@ -185,14 +186,14 @@ function Schedule({ name, lines, total, today }: { name: string; lines: PlanLine
 
 function BalancesDetail({ balances }: { balances: Balance[] }) {
   return (
-    <section class="acct" aria-label="주식·적금·대출">
+    <section class="acct" aria-label="주식·적금·보증금·대출">
       <header>
-        <h2>주식·적금·대출</h2>
+        <h2>주식·적금·보증금·대출</h2>
       </header>
       {balances.length === 0 ? (
         <p class="empty">아직 적어 둔 잔액이 없습니다.</p>
       ) : (
-        (["stock", "saving", "loan"] as const).map((k) => {
+        BALANCE_KINDS.map((k) => {
           const bs = balances.filter((b) => b.kind === k);
           if (bs.length === 0) return null;
           return (
@@ -225,9 +226,9 @@ function BalanceView({ balances }: { balances: Balance[] }) {
   return (
     <main class="layout">
       <aside class="summary">
-        <p class="caption">주식·적금·대출</p>
+        <p class="caption">주식·적금·보증금·대출</p>
         <ul class="transfer">
-          {(["stock", "saving", "loan"] as const).map((k) => (
+          {BALANCE_KINDS.map((k) => (
             <li class="kv">
               <span>{KIND_NAMES[k]}</span>
               <b>{won(sum(k))}</b>

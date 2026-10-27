@@ -1,7 +1,8 @@
 // SQLite 저장소 (node:sqlite, 파일 하나). 운영에서는 PVC 위 /data/moneylog.db.
 // 스키마 변경은 MIGRATIONS 끝에 붙이고 PRAGMA user_version 으로 어디까지 적용했는지 센다.
 import { DatabaseSync } from "node:sqlite";
-import type { Account, Balance, BalanceInput, Deposit, DepositInput, Item, ItemInput, Override, Settings, Spend, SpendCategory, SpendInput } from "../core/types.ts";
+import { BALANCE_KINDS } from "../core/types.ts";
+import type { Account, Balance, BalanceInput, BalanceKind, Deposit, DepositInput, Item, ItemInput, Override, Settings, Spend, SpendCategory, SpendInput } from "../core/types.ts";
 
 export type Db = DatabaseSync;
 
@@ -256,7 +257,7 @@ export function deleteDeposit(db: Db, id: number): boolean {
 
 const toBalance = (r: Row): Balance => ({
   id: Number(r.id),
-  kind: r.kind === "loan" ? "loan" : r.kind === "saving" ? "saving" : "stock",
+  kind: (BALANCE_KINDS as string[]).includes(String(r.kind)) ? (r.kind as BalanceKind) : "stock",
   name: String(r.name),
   amount: Number(r.amount),
   memo: String(r.memo),

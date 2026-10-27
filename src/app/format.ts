@@ -23,7 +23,7 @@ export const dayText = (d: string) =>
 export const dateText = (d: string) =>
   d.slice(0, 4) === todayStr().slice(0, 4) ? shortDate(d) : `${d.slice(0, 4)}.${shortDate(d)}`;
 
-export const KIND_NAMES: Record<BalanceKind, string> = { stock: "주식", saving: "적금", loan: "대출" };
+export const KIND_NAMES: Record<BalanceKind, string> = { stock: "주식", saving: "적금", deposit: "보증금", loan: "대출" };
 
 /** 2026-10 → 2026년 10월 */
 export const labelText = (label: string) => `${label.slice(0, 4)}년 ${Number(label.slice(5, 7))}월`;
