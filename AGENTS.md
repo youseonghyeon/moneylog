@@ -46,7 +46,7 @@
 ## 사용자와 일하는 방식
 - 한국어 존댓말 어미, 짧고 직설적으로.
 - 큰 화면 변경·새 기능은 방향을 먼저 보여 주고 확인받는다.
-- 커밋은 아래 검증 통과 후, 경로를 지정해 stage(`git add -A` 금지). 원격 생성·push·클러스터 쓰기(`kubectl apply`)는 사용자 몫 또는 사용자 승인 후.
+- 커밋은 아래 검증 통과 후, 경로를 지정해 stage(`git add -A` 금지). 검증을 통과한 커밋은 묻지 않고 바로 `git pull --rebase` 후 push 한다(사용자 지시 2026-10-27 — main push 가 곧 배포). 원격 생성·클러스터 쓰기(`kubectl apply`)는 사용자 몫.
 
 ## 배포 (kube-sim·net-sim 과 같은 흐름, 차이는 서버·PVC·노출 범위)
 - `Dockerfile`: 화면 번들 → `node:24-alpine` 에서 `node src/server/main.ts`(비특권 node uid 1000, 8080). `DB_PATH=/data/moneylog.db`.
