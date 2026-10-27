@@ -10,7 +10,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error("서버에 연결하지 못했습니다. 내부망·wg 연결을 확인해 주세요.");
+    throw new Error("서버에 연결하지 못했습니다. wg 연결을 확인해 주세요.");
   }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
