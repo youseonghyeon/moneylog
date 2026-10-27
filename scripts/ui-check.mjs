@@ -69,6 +69,7 @@ try {
   await post("POST", "/api/balances", { kind: "stock", name: "토스증권", amount: 3200000 });
   await post("POST", "/api/balances", { kind: "loan", name: "전세대출", amount: 120000000 });
   await post("POST", "/api/balances", { kind: "saving", name: "청년미래적금", amount: 1500000, memo: "2027-06 만기" });
+  await post("PUT", `/api/budget/${ym}`, { amount: 600000 });
   const sp = (date, time, amount, category, merchant, ref) => post("POST", "/api/spends", { date, time, amount, category, merchant, source: "신한카드 신용", ref });
   await sp(today, "12:05", 9600, "식비", "왓더버거", "t1");
   await sp(today, "09:35", 3300, "카페·간식", "메가커피", "t2");
@@ -135,7 +136,14 @@ try {
   // 지출 탭
   await page.getByRole("tab", { name: "생활비" }).click();
   check((await total()) === "42,900원", "지출 합계 42,900원 (환불 −20,000 반영)");
-  check((await page.locator(".summary .put").innerText()).includes(`${now.getDate()}일째`), "하루 평균 · N일째");
+  check((await page.locator(".summary .put").first().innerText()).includes(`${now.getDate()}일째`), "하루 평균 · N일째");
+  // 생활비 예정액 600,000 − 쓴 돈 42,900 = 557,100 을 오늘 포함 남은 날로 나눈다
+  const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() + 1;
+  check((await page.locator(".budget .put").innerText()) === "예정 600,000원 · 남은 557,100원", "예정액·남은 금액");
+  check(
+    (await page.locator(".per-day").innerText()).replace(/\s+/g, " ") === `하루 ${Math.floor(557100 / daysLeft).toLocaleString("ko-KR")}원 사용 가능 · ${daysLeft}일 남음`,
+    `하루 사용 가능 금액 (${daysLeft}일 남음)`,
+  );
   check(
     (await page.locator(".cats .cat").allInnerTexts()).join(",") === "쇼핑,식비,카페·간식",
     "분류는 큰 것부터 (쇼핑 30,000 · 식비 9,600 · 카페 3,300)",

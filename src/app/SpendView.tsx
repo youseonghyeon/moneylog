@@ -1,6 +1,6 @@
 // 생활비 탭: 그 기간 생활비 거래 — 합계·하루 평균 · 분류별 막대(누르면 그 분류 거래, 금액순/날짜순) · 달력(날마다 합계, 누르면 그날 거래)
 import { useEffect, useRef, useState } from "preact/hooks";
-import { summarizeSpends } from "../core/spend.ts";
+import { budgetLeft, summarizeSpends } from "../core/spend.ts";
 import type { Period, Spend, SpendCategory } from "../core/types.ts";
 import { addDays, calAmount, dayText, shortDate, todayStr, won } from "./format.ts";
 import { useWide } from "./useWide.ts";
@@ -20,7 +20,7 @@ function weeksOf(p: Period): (string | null)[][] {
   return weeks;
 }
 
-export function SpendView({ spends, period }: { spends: Spend[]; period: Period }) {
+export function SpendView({ spends, period, budget }: { spends: Spend[]; period: Period; budget: number | null }) {
   const today = todayStr();
   const r = summarizeSpends(spends, period, today);
   const byDay = new Map(r.days.map((d) => [d.date, d]));
@@ -62,6 +62,7 @@ export function SpendView({ spends, period }: { spends: Spend[]; period: Period 
             하루 평균 {won(r.dailyAvg)} · {r.daysElapsed}일째
           </p>
         )}
+        {budget != null && <Budget budget={budget} spent={r.total} period={period} today={today} />}
         {r.byCategory.length > 0 && (
           <>
             <h3>분류별</h3>
@@ -158,5 +159,22 @@ export function SpendView({ spends, period }: { spends: Spend[]; period: Period 
         )}
       </div>
     </main>
+  );
+}
+
+/** 생활비 예정액 대비 — 남은 돈과, 남은 날로 나눈 하루 사용 가능 금액 */
+function Budget({ budget, spent, period, today }: { budget: number; spent: number; period: Period; today: string }) {
+  const b = budgetLeft(budget, spent, period, today);
+  return (
+    <div class="budget">
+      <p class="put">
+        예정 {won(budget)} · {b.left < 0 ? <span class="over">{won(-b.left)} 넘게 씀</span> : `남은 ${won(b.left)}`}
+      </p>
+      {b.daysLeft > 0 && (
+        <p class="per-day">
+          하루 <b>{won(b.perDay)}</b> 사용 가능 <small>· {b.daysLeft}일 남음</small>
+        </p>
+      )}
+    </div>
   );
 }

@@ -464,6 +464,30 @@ button.icon {
     font-size: 13px;
   }
 }
+/* 생활비 예정액: 하루 사용 가능 금액 */
+.budget {
+  margin: 10px 0 4px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+}
+.budget .put {
+  margin: 0;
+}
+.per-day {
+  margin: 4px 0 0;
+  font-size: 15px;
+}
+.per-day b {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.per-day small {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.over {
+  color: var(--error);
+}
 .note {
   margin: 0;
   font-size: 13px;

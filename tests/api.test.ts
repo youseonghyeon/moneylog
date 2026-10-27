@@ -196,6 +196,18 @@ describe("API", () => {
     expect((await call("DELETE", `/api/spends/${oct[0].id}`)).status).toBe(404);
   });
 
+  it("생활비 예정액: 기간별로 넣고 고치고 지운다", async () => {
+    expect((await call("GET", "/api/budget/2026-10")).json).toEqual({ period: "2026-10", amount: null });
+    expect((await call("PUT", "/api/budget/2026-10", { amount: 600_000 })).json).toEqual({ period: "2026-10", amount: 600_000 });
+    await call("PUT", "/api/budget/2026-10", { amount: 550_000 });
+    expect((await call("GET", "/api/budget/2026-10")).json.amount).toBe(550_000);
+    expect((await call("GET", "/api/budget/2026-11")).json.amount).toBeNull();
+    expect((await call("PUT", "/api/budget/2026-10", { amount: -1 })).status).toBe(400);
+    expect((await call("PUT", "/api/budget/2026-1", { amount: 1 })).status).toBe(400);
+    expect((await call("DELETE", "/api/budget/2026-10")).status).toBe(204);
+    expect((await call("GET", "/api/budget/2026-10")).json.amount).toBeNull();
+  });
+
   it("생활비 거래 입력 검사", async () => {
     const sp = { date: "2026-10-20", amount: 1, category: "식비", merchant: "a" };
     const cases: [unknown, RegExp][] = [
@@ -248,10 +260,10 @@ describe("DB 파일", () => {
       const path = join(dir, "v1.db");
       const a = openDb(path);
       a.exec("INSERT INTO item (account_id, name, amount, cycle) VALUES (3, '월세', 550000, 'monthly')");
-      a.exec("DROP TABLE deposit; DROP TABLE balance; DROP TABLE spend; ALTER TABLE item DROP COLUMN living; PRAGMA user_version = 1;");
+      a.exec("DROP TABLE deposit; DROP TABLE balance; DROP TABLE spend; DROP TABLE budget; ALTER TABLE item DROP COLUMN living; PRAGMA user_version = 1;");
       a.close();
       const b = openDb(path);
-      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 4 });
+      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 5 });
       expect(b.prepare("SELECT COUNT(*) AS n FROM spend").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT COUNT(*) AS n FROM deposit").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT COUNT(*) AS n FROM balance").get()).toEqual(expect.objectContaining({ n: 0 }));

@@ -24,5 +24,6 @@ export const api = {
   items: () => req<Item[]>("GET", "/api/items"),
   balances: () => req<Balance[]>("GET", "/api/balances"),
   spends: (period: string) => req<Spend[]>("GET", `/api/spends?period=${period}`),
+  budget: (period: string) => req<{ period: string; amount: number | null }>("GET", `/api/budget/${period}`),
   settings: () => req<Settings>("GET", "/api/settings"),
 };

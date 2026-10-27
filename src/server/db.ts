@@ -71,6 +71,9 @@ const MIGRATIONS = [
   `
   ALTER TABLE item ADD COLUMN living INTEGER NOT NULL DEFAULT 0;
   `,
+  `
+  CREATE TABLE budget (period TEXT PRIMARY KEY, amount INTEGER NOT NULL);
+  `,
 ];
 
 export function openDb(path: string): Db {
@@ -317,4 +320,18 @@ export function createSpend(db: Db, s: SpendInput): Spend | null {
 
 export function deleteSpend(db: Db, id: number): boolean {
   return db.prepare("DELETE FROM spend WHERE id = ?").run(id).changes > 0;
+}
+
+/** 기간 하나의 생활비 예정액 (모든 통장 합계). 없으면 null */
+export function getBudget(db: Db, period: string): number | null {
+  const r = db.prepare("SELECT amount FROM budget WHERE period = ?").get(period) as { amount: number } | undefined;
+  return r ? Number(r.amount) : null;
+}
+
+export function setBudget(db: Db, period: string, amount: number): void {
+  db.prepare("INSERT INTO budget (period, amount) VALUES (?, ?) ON CONFLICT (period) DO UPDATE SET amount = excluded.amount").run(period, amount);
+}
+
+export function deleteBudget(db: Db, period: string): void {
+  db.prepare("DELETE FROM budget WHERE period = ?").run(period);
 }

@@ -24,6 +24,7 @@ export function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [spends, setSpends] = useState<Spend[]>([]);
+  const [budget, setBudget] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<Tab>(tabOf);
 
@@ -31,12 +32,13 @@ export function App() {
     try {
       const s = await api.settings();
       const l = label ?? labelOf(todayStr(), s.startDay);
-      const [p, its, bs, sp] = await Promise.all([api.plan(l), api.items(), api.balances(), api.spends(l)]);
+      const [p, its, bs, sp, bu] = await Promise.all([api.plan(l), api.items(), api.balances(), api.spends(l), api.budget(l)]);
       setSettings(s);
       setPlan(p);
       setItems(its);
       setBalances(bs);
       setSpends(sp);
+      setBudget(bu.amount);
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -92,7 +94,7 @@ export function App() {
       )}
 
       {tab === "plan" && <PlanView plan={plan} items={items} />}
-      {tab === "spend" && <SpendView spends={spends} period={plan.period} />}
+      {tab === "spend" && <SpendView spends={spends} period={plan.period} budget={budget} />}
       {tab === "balance" && <BalanceView balances={balances} />}
     </div>
   );

@@ -45,3 +45,19 @@ export function summarizeSpends(spends: Spend[], period: Period, today: string):
     dailyAvg: daysElapsed ? Math.round(total / daysElapsed) : 0,
   };
 }
+
+export interface BudgetLeft {
+  /** 예정액 − 쓴 돈 (넘게 쓰면 음수) */
+  left: number;
+  /** 오늘 포함 기간 끝까지 남은 날 (지난 기간이면 0) */
+  daysLeft: number;
+  /** 남은 돈 ÷ 남은 날 — 안 쓰면 날마다 커진다. 남은 돈이 없거나 기간이 끝났으면 0 */
+  perDay: number;
+}
+
+export function budgetLeft(budget: number, spent: number, period: Period, today: string): BudgetLeft {
+  const from = today < period.start ? period.start : today;
+  const daysLeft = today > period.end ? 0 : dayNo(period.end) - dayNo(from) + 1;
+  const left = budget - spent;
+  return { left, daysLeft, perDay: daysLeft > 0 && left > 0 ? Math.floor(left / daysLeft) : 0 };
+}

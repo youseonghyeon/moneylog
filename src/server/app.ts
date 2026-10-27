@@ -162,6 +162,28 @@ export function createApp(db: Db, today: () => string = localToday): Hono {
     return c.body(null, 204);
   });
 
+  // 생활비 예정액 (기간별, 모든 통장 합계)
+  app.get("/api/budget/:period", (c) => {
+    const period = c.req.param("period");
+    if (!isLabel(period)) return bad(c, "기간은 YYYY-MM 형식이어야 합니다.");
+    return c.json({ period, amount: store.getBudget(db, period) });
+  });
+
+  app.put("/api/budget/:period", async (c) => {
+    const period = c.req.param("period");
+    if (!isLabel(period)) return bad(c, "기간은 YYYY-MM 형식이어야 합니다.");
+    const b = (await body(c)) as Record<string, unknown> | null;
+    const amount = checkAmount(b?.amount);
+    if (!amount.ok) return bad(c, amount.error);
+    store.setBudget(db, period, amount.value);
+    return c.json({ period, amount: amount.value });
+  });
+
+  app.delete("/api/budget/:period", (c) => {
+    store.deleteBudget(db, c.req.param("period"));
+    return c.body(null, 204);
+  });
+
   // 생활비 거래 (보기 전용 — 계획 합계에 안 들어간다)
   app.get("/api/spends", (c) => {
     const period = c.req.query("period");
