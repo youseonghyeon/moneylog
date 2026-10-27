@@ -47,8 +47,9 @@
 ## 배포 (kube-sim·net-sim 과 같은 흐름, 차이는 서버·PVC·노출 범위)
 - `Dockerfile`: 화면 번들 → `node:24-alpine` 에서 `node src/server/main.ts`(비특권 node uid 1000, 8080). `DB_PATH=/data/moneylog.db`.
 - `.github/workflows/docker-image.yml`: main push → typecheck + test 게이트 → `ghcr.io/youseonghyeon/moneylog`(`<sha>`, `latest`) → `deploy/values.yaml` 의 `image.tag` 봇 커밋. push 전에 `git pull --rebase`.
-- `deploy/`: Helm 차트. Deployment(`replicas: 1`, `Recreate` — SQLite + RWO), PVC(`moneylog-data`, 기본 StorageClass, ArgoCD·helm 이 지우지 않게 주석), Service, Ingress(k3s 기본 traefik, `host`·`tlsSecretName` 은 values — **내부망·wg 망 전용, WAN 노출 금지**: 로그인 기능이 없다. Tailscale 은 쓰지 않는다(사용자 결정 2026-10-27)), `revisionHistoryLimit: 3`(옛 ReplicaSet 3개까지, 사용자 요청).
+- `deploy/`: Helm 차트. Deployment(`replicas: 1`, `Recreate` — SQLite + RWO), PVC(`moneylog-data`, 기본 StorageClass, ArgoCD·helm 이 지우지 않게 주석), Service(ClusterIP), Ingress(템플릿은 있으나 `enabled: false` — traefik 80/443 은 공인 IP 로 포워딩돼 켜면 인터넷에 노출된다, 2026-10-27 사고), `revisionHistoryLimit: 3`(옛 ReplicaSet 3개까지, 사용자 요청).
 - `argocd/application.yaml`: namespace `app`, automated prune/selfHeal.
+- 접근 경로: `http://192.168.8.103:10014/` (내부망·wg 전용). k3s servicelb 로 서버에서 중앙 관리한다 — 저장소에 NodePort·LoadBalancer·Ingress 를 넣지 않는다(사용자 결정 2026-10-27).
 - 차트를 고치면 `helm lint deploy && helm template moneylog deploy` 로 확인.
 
 ## 검증
