@@ -1,5 +1,5 @@
 // 브라우저 스모크: 운영과 같은 서버(node src/server/main.ts — dist + /api)를 빈 임시 DB 로 띄우고,
-// 에이전트가 하듯 API 로 데이터를 넣은 뒤 보기 전용 화면(계획·지출 탭)을 실제 브라우저로 확인한다. 스크린샷은 .shots/.
+// 에이전트가 하듯 API 로 데이터를 넣은 뒤 보기 전용 화면(예정·지출 탭)을 실제 브라우저로 확인한다. 스크린샷은 .shots/.
 // 실행: npm run ui-check   (포트 5299 — 사용자의 5173·8787 과 겹치지 않게)
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -85,15 +85,26 @@ try {
   const total = () => page.locator(".total").innerText();
   const acct = (name) => page.locator(`section.acct[aria-label="${name}"]`);
 
-  // 계획 탭
+  // 예정 탭
   check((await page.locator(".transfer li").count()) === 3, "기본 계좌 3개");
   check((await total()) === "1,531,230원", "합계 1,531,230원 (전기 실제 금액 반영)");
   check((await page.locator(".summary .hint").innerText()).includes("예상 금액 1건"), "변동 항목 실제 금액 없으면 예상 1건");
   check((await acct("생활비").locator("em", { hasText: "예상" }).count()) === 1, "식비에 '예상' 표시");
   check((await acct("생활비").locator(".left").innerText()).includes("남음 200,000원"), "생활비 800,000 − 600,000 → 남음 200,000원");
   check((await acct("대출·고지서").locator(".left .short").innerText()) === "부족 81,230원", "대출·고지서 300,000 − 381,230 → 부족 81,230원");
-  check((await page.locator(".summary .put").innerText()).includes("넣은 돈 1,100,000원 · 부족 431,230원"), "요약: 넣은 돈·부족");
+  check((await page.locator(".summary .put").last().innerText()).includes("넣은 돈 1,100,000원 · 부족 431,230원"), "요약: 넣은 돈·부족");
   check((await page.locator(".idle summary").innerText()).includes("1개"), "다른 달 매년 항목은 '안 나가는 항목'");
+  // 날짜가 지났고 금액이 확정된 줄만 "나감" (대출 이자 5일 · 전기 20일(실제 금액) · 월세 25일). 식비는 예상이라 아님
+  const gone = [[5, 320000], [20, 61230], [25, 550000]].filter(([d]) => d <= now.getDate());
+  check((await page.locator("em", { hasText: "나감" }).count()) === gone.length, `지난 확정 항목은 '나감' (${gone.length}건)`);
+  check((await acct("생활비").locator("em", { hasText: "나감" }).count()) === 0, "예상 금액 항목은 날짜가 지나도 '나감' 아님");
+  if (gone.length) {
+    const g = gone.reduce((s, [, a]) => s + a, 0);
+    check(
+      (await page.locator(".summary .put").first().innerText()) === `이미 나간 돈 ${g.toLocaleString("ko-KR")}원 · 앞으로 ${(1531230 - g).toLocaleString("ko-KR")}원`,
+      "요약: 이미 나간 돈 · 앞으로",
+    );
+  }
   const bal = acct("주식·적금·대출");
   check(
     (await bal.locator(".kind h3").allInnerTexts()).join("|").replace(/\s+/g, " ") === "주식 3,200,000원|적금 1,500,000원|대출 120,000,000원",
@@ -111,7 +122,7 @@ try {
   // 다음 달: 전기는 예상 50,000 으로, 자동차보험(다음 달 매년)이 더해진다 → 550,000 + 50,000 + 320,000 + 600,000 + 900,000
   await page.waitForFunction(() => document.querySelector(".total")?.textContent === "2,420,000원");
   check(true, "다음 기간: 전기는 예상 금액으로, 매년 항목은 그 달에 → 2,420,000원");
-  check((await page.locator(".summary .put").count()) === 0, "다음 기간엔 이번 기간 입금이 안 보인다");
+  check((await page.getByText(/넣은 돈/).count()) === 0, "다음 기간엔 이번 기간 입금이 안 보인다");
   await page.getByLabel("이전 기간").click();
   await page.waitForFunction(() => document.querySelector(".total")?.textContent === "1,531,230원");
 
@@ -140,8 +151,8 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector(".cats");
   check(page.url().endsWith("#spend"), "새로 고쳐도 지출 탭 유지 (#spend)");
-  await page.getByRole("tab", { name: "계획" }).click();
-  check(!page.url().includes("#"), "계획 탭으로 돌아가면 주소에서 #spend 가 빠진다");
+  await page.getByRole("tab", { name: "예정" }).click();
+  check(!page.url().includes("#"), "예정 탭으로 돌아가면 주소에서 #spend 가 빠진다");
 
   // 넓은 화면 · 다크
   await page.setViewportSize({ width: 1280, height: 860 });
@@ -151,7 +162,7 @@ try {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.screenshot({ path: `${OUT}/05-spend-desktop-dark.png` });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("tab", { name: "계획" }).click();
+  await page.getByRole("tab", { name: "예정" }).click();
   await page.screenshot({ path: `${OUT}/06-plan-mobile-dark.png` });
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

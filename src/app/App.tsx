@@ -1,9 +1,9 @@
-// 한 화면, 탭 둘. 보기 전용 — 입력은 사용자 대신 에이전트가 API 로 넣는다(사용자 결정 2026-10-27).
-// 계획: 기간 이동 · 계좌별 넣어 둘 금액 · 계좌마다 입금·항목 · 이번 기간에 안 나가는 항목 · 주식·적금·대출 잔액
+// 한 화면, 탭 둘(예정 · 지출). 보기 전용 — 입력은 사용자 대신 에이전트가 API 로 넣는다(사용자 결정 2026-10-27).
+// 예정: 기간 이동 · 계좌별 넣어 둘 금액 · 계좌마다 입금·항목 · 이번 기간에 안 나가는 항목 · 주식·적금·대출 잔액
 // 지출: 그 기간 생활비 거래 — 분류별·날짜별
 import { useEffect, useState } from "preact/hooks";
 import { labelOf, shiftLabel } from "../core/period.ts";
-import type { Balance, Item, Plan, Settings, Spend } from "../core/types.ts";
+import type { Balance, Item, Plan, PlanLine, Settings, Spend } from "../core/types.ts";
 import { api } from "./api.ts";
 import { dateText, KIND_NAMES, labelText, leftText, scheduleText, shortDate, todayStr, won } from "./format.ts";
 import { SpendView } from "./SpendView.tsx";
@@ -73,7 +73,7 @@ export function App() {
       <nav class="tabs" role="tablist">
         {(["plan", "spend"] as const).map((t) => (
           <button type="button" role="tab" aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => go(t)}>
-            {t === "plan" ? "계획" : "지출"}
+            {t === "plan" ? "예정" : "지출"}
           </button>
         ))}
       </nav>
@@ -95,7 +95,11 @@ export function App() {
 
 function PlanView({ plan, items, balances }: { plan: Plan; items: Item[]; balances: Balance[] }) {
   const today = todayStr();
-  const estimated = plan.accounts.flatMap((a) => a.lines).filter((l) => l.estimated).length;
+  const lines = plan.accounts.flatMap((a) => a.lines);
+  const estimated = lines.filter((l) => l.estimated).length;
+  // 날짜가 지났고 금액이 확정된 줄 = 이미 나간 돈 (예상 금액은 아직 확정이 아니라 나갔다고 보지 않는다)
+  const gone = (l: PlanLine) => l.due <= today && !l.estimated;
+  const goneTotal = lines.filter(gone).reduce((s, l) => s + l.amount, 0);
   const due = new Set(plan.accounts.flatMap((a) => a.lines.map((l) => l.item.id)));
   const idle = items.filter((it) => !due.has(it.id));
   const accountName = new Map(plan.accounts.map((a) => [a.account.id, a.account.name]));
@@ -105,6 +109,11 @@ function PlanView({ plan, items, balances }: { plan: Plan; items: Item[]; balanc
       <aside class="summary">
         <p class="caption">이번 기간에 필요한 돈</p>
         <p class="total">{won(plan.total)}</p>
+        {goneTotal > 0 && (
+          <p class="put">
+            이미 나간 돈 {won(goneTotal)} · 앞으로 {won(plan.total - goneTotal)}
+          </p>
+        )}
         {estimated > 0 && <p class="hint">예상 금액 {estimated}건 포함</p>}
         {plan.deposited > 0 && (
           <p class="put">
@@ -163,6 +172,7 @@ function PlanView({ plan, items, balances }: { plan: Plan; items: Item[]; balanc
                     <span class="name">
                       {l.item.name}
                       {l.estimated && <em>예상</em>}
+                      {gone(l) && <em class="muted">나감</em>}
                       {l.item.cycle === "yearly" && <em class="muted">매년</em>}
                     </span>
                     <span class="amt">{won(l.amount)}</span>
