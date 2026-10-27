@@ -47,7 +47,7 @@
 ## 배포 (kube-sim·net-sim 과 같은 흐름, 차이는 서버·PVC·노출 범위)
 - `Dockerfile`: 화면 번들 → `node:24-alpine` 에서 `node src/server/main.ts`(비특권 node uid 1000, 8080). `DB_PATH=/data/moneylog.db`.
 - `.github/workflows/docker-image.yml`: main push → typecheck + test 게이트 → `ghcr.io/youseonghyeon/moneylog`(`<sha>`, `latest`) → `deploy/values.yaml` 의 `image.tag` 봇 커밋. push 전에 `git pull --rebase`.
-- `deploy/`: Helm 차트. Deployment(`replicas: 1`, `Recreate` — SQLite + RWO), PVC(`moneylog-data`, 기본 StorageClass, ArgoCD·helm 이 지우지 않게 주석), Service, Ingress(tailscale, **funnel 없음 — tailnet 전용, WAN 노출 금지**: 로그인 기능이 없다).
+- `deploy/`: Helm 차트. Deployment(`replicas: 1`, `Recreate` — SQLite + RWO), PVC(`moneylog-data`, 기본 StorageClass, ArgoCD·helm 이 지우지 않게 주석), Service, Ingress(k3s 기본 traefik, `host`·`tlsSecretName` 은 values — **내부망·wg 망 전용, WAN 노출 금지**: 로그인 기능이 없다. Tailscale 은 쓰지 않는다(사용자 결정 2026-10-27)), `revisionHistoryLimit: 3`(옛 ReplicaSet 3개까지, 사용자 요청).
 - `argocd/application.yaml`: namespace `app`, automated prune/selfHeal.
 - 차트를 고치면 `helm lint deploy && helm template moneylog deploy` 로 확인.
 

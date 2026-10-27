@@ -1,15 +1,30 @@
-# tailnet 전용. tailscale.com/funnel 주석을 붙이지 않는다 (공인 인터넷 노출 금지 — 로그인 기능이 없다)
+# k3s 기본 traefik(ServiceLB — 노드의 80/443)으로 내부망·wg 망에서만 연다. 공유기에서 포트를 열지 않는다 (로그인 기능이 없다)
+{{- if .Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: moneylog
 spec:
-  ingressClassName: tailscale
-  defaultBackend:
-    service:
-      name: moneylog
-      port:
-        number: {{ .Values.service.port }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- with .Values.ingress.tlsSecretName }}
   tls:
-    - hosts:
-        - {{ .Values.ingress.hostname }}
+    - secretName: {{ . }}
+      {{- with $.Values.ingress.host }}
+      hosts:
+        - {{ . | quote }}
+      {{- end }}
+  {{- end }}
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: moneylog
+                port:
+                  number: {{ .Values.service.port }}
+      {{- with .Values.ingress.host }}
+      host: {{ . | quote }}
+      {{- end }}
+{{- end }}
