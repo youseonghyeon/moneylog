@@ -347,14 +347,44 @@ button.icon {
   margin: 6px 0 12px;
   padding: 0;
 }
-.cats li {
+.cats .cat-pick {
   display: grid;
+  width: calc(100% + 12px);
+  margin: 0 -6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
   /* 금액 칸 너비를 고정해야 줄마다 막대 길이가 같은 잣대가 된다 */
   grid-template-columns: 72px 1fr 104px;
   align-items: center;
   gap: 10px;
-  padding: 6px 0;
+  padding: 6px;
   font-size: 14px;
+}
+.cats .cat-pick:hover,
+.cats .cat-pick.on {
+  background: var(--surface-2);
+}
+.cats .cat-pick.on {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+/* 분류 목록 정렬: 금액순 | 날짜순 */
+.sort {
+  display: flex;
+  gap: 4px;
+  padding: 2px 16px 6px;
+}
+.sort-btn {
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+  background: none;
+}
+.sort-btn.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
 }
 .bar {
   height: 8px;

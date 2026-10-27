@@ -8,6 +8,7 @@ import type { Balance, Item, Plan, PlanLine, Settings, Spend } from "../core/typ
 import { api } from "./api.ts";
 import { dateText, KIND_NAMES, labelText, scheduleText, shortDate, todayStr, won } from "./format.ts";
 import { SpendView } from "./SpendView.tsx";
+import { useWide } from "./useWide.ts";
 
 type Tab = "plan" | "spend" | "balance";
 const TABS: [Tab, string][] = [
@@ -99,20 +100,6 @@ export function App() {
 
 /** 요약의 줄 하나 = 버튼. 누르면 그 내용을 연다 (PC: 오른쪽, 휴대폰: 줄 바로 아래) */
 type Pick = number | "balances" | "idle";
-const WIDE = "(min-width: 860px)";
-
-function useWide(): boolean {
-  const [wide, setWide] = useState(() => matchMedia(WIDE).matches);
-  useEffect(() => {
-    const on = () => setWide(matchMedia(WIDE).matches);
-    window.addEventListener("resize", on);
-    // 그린 뒤 리스너를 붙이기 전에 화면 폭이 바뀌었을 수 있다 — 붙이자마자 한 번 다시 잰다
-    on();
-    return () => window.removeEventListener("resize", on);
-  }, []);
-  return wide;
-}
-
 function PlanView({ plan, items }: { plan: Plan; items: Item[] }) {
   const today = todayStr();
   const wide = useWide();

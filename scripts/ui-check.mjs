@@ -118,8 +118,8 @@ try {
   await pick("안 나가는 항목").click();
   await page.screenshot({ path: `${OUT}/01-plan-mobile.png`, fullPage: true });
   // 보기 전용: 입력 수단이 없다
-  // 요약 줄(.pick)·지출 달력 칸은 볼 것을 고르는 버튼이라 뺀다
-  const inputs = await page.locator("main button:not(.cal-cell):not(.pick), main input, main select, main textarea, [aria-label='설정']").count();
+  // 요약 줄·분류·정렬·달력 칸은 볼 것을 고르는 버튼이라 뺀다
+  const inputs = await page.locator("main button:not(.cal-cell):not(.pick):not(.cat-pick):not(.sort-btn), main input, main select, main textarea, [aria-label='설정']").count();
   check(inputs === 0, `입력 버튼·입력칸 없음 (${inputs})`);
   check((await page.getByText(/항목 추가|\+ 입금|추가$/).count()) === 0, "'추가'·'입금' 버튼 문구 없음");
   await page.screenshot({ path: `${OUT}/01-plan-mobile.png`, fullPage: true });
@@ -153,6 +153,19 @@ try {
     check((await picked.locator(".amt.refund").count()) === 1, "환불은 흐리게");
     await page.locator(".cal-cell.today").click();
   }
+  // 분류를 누르면 그 분류 거래 — 금액 큰 순, 날짜순으로 바꿀 수 있다
+  const catList = page.locator('section[aria-label="고른 분류"]');
+  await page.locator(".cat-pick", { hasText: "쇼핑" }).click();
+  check((await catList.locator("header .sum").innerText()) === "30,000원", "쇼핑을 누르면 쇼핑 거래 목록 (합계 30,000원)");
+  check((await catList.locator(".amt").allInnerTexts()).join("|") === "50,000원|-20,000원", "처음엔 금액 큰 순");
+  await catList.getByRole("button", { name: "날짜순" }).click();
+  check((await catList.locator(".amt").allInnerTexts()).join("|") === "-20,000원|50,000원", "날짜순: 같은 날이면 늦은 시각부터");
+  await page.screenshot({ path: `${OUT}/02b-spend-category-mobile.png`, fullPage: true });
+  await page.locator(".cat-pick", { hasText: "쇼핑" }).click();
+  check((await catList.count()) === 0 && (await page.locator('section[aria-label="고른 날"]').count()) === 1, "같은 분류를 다시 누르면 날짜 보기로");
+  await page.locator(".cat-pick", { hasText: "식비" }).click();
+  await page.locator(".cal-cell.today").click();
+  check((await catList.count()) === 0, "달력 날짜를 누르면 날짜 보기로");
   await page.screenshot({ path: `${OUT}/02-spend-mobile.png`, fullPage: true });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector(".cats");
