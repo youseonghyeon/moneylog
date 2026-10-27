@@ -1,5 +1,5 @@
 // /api 호출. 실패하면 서버가 준 문구로 Error 를 던진다 (화면이 그대로 보여 줌).
-import type { Account, Balance, BalanceInput, Deposit, DepositInput, Item, ItemInput, Plan, Settings } from "../core/types.ts";
+import type { Balance, Item, Plan, Settings, Spend } from "../core/types.ts";
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
@@ -18,25 +18,11 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   return data as T;
 }
 
+// 화면은 보기 전용 — 쓰기 API 는 에이전트가 직접 부른다
 export const api = {
   plan: (period: string) => req<Plan>("GET", `/api/plan?period=${period}`),
-  accounts: () => req<Account[]>("GET", "/api/accounts"),
-  createAccount: (name: string, memo: string) => req<Account>("POST", "/api/accounts", { name, memo }),
-  updateAccount: (id: number, name: string, memo: string) => req<Account>("PUT", `/api/accounts/${id}`, { name, memo }),
-  deleteAccount: (id: number) => req<void>("DELETE", `/api/accounts/${id}`),
   items: () => req<Item[]>("GET", "/api/items"),
-  createItem: (it: ItemInput) => req<Item>("POST", "/api/items", it),
-  updateItem: (id: number, it: ItemInput) => req<Item>("PUT", `/api/items/${id}`, it),
-  deleteItem: (id: number) => req<void>("DELETE", `/api/items/${id}`),
-  setActual: (id: number, period: string, amount: number) => req<void>("PUT", `/api/items/${id}/actual/${period}`, { amount }),
-  clearActual: (id: number, period: string) => req<void>("DELETE", `/api/items/${id}/actual/${period}`),
-  createDeposit: (d: DepositInput) => req<Deposit>("POST", "/api/deposits", d),
-  updateDeposit: (id: number, d: DepositInput) => req<Deposit>("PUT", `/api/deposits/${id}`, d),
-  deleteDeposit: (id: number) => req<void>("DELETE", `/api/deposits/${id}`),
   balances: () => req<Balance[]>("GET", "/api/balances"),
-  createBalance: (b: BalanceInput) => req<Balance>("POST", "/api/balances", b),
-  updateBalance: (id: number, b: BalanceInput) => req<Balance>("PUT", `/api/balances/${id}`, b),
-  deleteBalance: (id: number) => req<void>("DELETE", `/api/balances/${id}`),
+  spends: (period: string) => req<Spend[]>("GET", `/api/spends?period=${period}`),
   settings: () => req<Settings>("GET", "/api/settings"),
-  setSettings: (s: Settings) => req<Settings>("PUT", "/api/settings", s),
 };

@@ -169,6 +169,42 @@ describe("API", () => {
     expect((await call("PUT", `/api/balances/${c.json.id}`, { kind: "stock", name: "a", amount: 1 })).status).toBe(404);
   });
 
+  it("생활비 거래: 기간(시작일 기준)으로 조회, 같은 ref 는 409, 환불은 음수", async () => {
+    await call("PUT", "/api/settings", { startDay: 20 });
+    const sp = { date: "2026-10-20", time: "12:05", amount: 9600, category: "식비", merchant: "왓더버거", source: "신한카드 신용", ref: "card:1" };
+    expect((await call("POST", "/api/spends", sp)).status).toBe(201);
+    const dup = await call("POST", "/api/spends", sp);
+    expect(dup.status).toBe(409);
+    expect(dup.json.error).toMatch(/이미 넣은 거래/);
+    await call("POST", "/api/spends", { ...sp, date: "2026-11-19", time: null, amount: -3000, ref: "card:2" });
+    await call("POST", "/api/spends", { ...sp, date: "2026-10-19", ref: "card:3" }); // 앞 기간
+    await call("POST", "/api/spends", { ...sp, ref: undefined });
+    await call("POST", "/api/spends", { ...sp, ref: "" }); // ref 없으면 겹쳐도 넣는다
+    const oct = (await call("GET", "/api/spends?period=2026-10")).json;
+    expect(oct.map((x: { amount: number }) => x.amount)).toEqual([9600, 9600, 9600, -3000]);
+    expect((await call("GET", "/api/spends?period=2026-09")).json).toHaveLength(1);
+    expect((await call("GET", "/api/spends")).status).toBe(400);
+    expect((await call("DELETE", `/api/spends/${oct[0].id}`)).status).toBe(204);
+    expect((await call("DELETE", `/api/spends/${oct[0].id}`)).status).toBe(404);
+  });
+
+  it("생활비 거래 입력 검사", async () => {
+    const sp = { date: "2026-10-20", amount: 1, category: "식비", merchant: "a" };
+    const cases: [unknown, RegExp][] = [
+      [{ ...sp, date: "2026-10-32" }, /날짜/],
+      [{ ...sp, time: "25:00" }, /시각/],
+      [{ ...sp, amount: 0 }, /0 이 아닌/],
+      [{ ...sp, amount: 1.5 }, /0 이 아닌/],
+      [{ ...sp, category: "술값" }, /분류는/],
+      [{ ...sp, merchant: " " }, /가맹점/],
+    ];
+    for (const [b, msg] of cases) {
+      const r = await call("POST", "/api/spends", b);
+      expect(r.status, JSON.stringify(b)).toBe(400);
+      expect(r.json.error).toMatch(msg);
+    }
+  });
+
   it("period 없음·없는 API 는 JSON 오류", async () => {
     expect((await call("GET", "/api/plan")).status).toBe(400);
     const r = await call("GET", "/api/nope");
@@ -198,16 +234,17 @@ describe("DB 파일", () => {
     }
   });
 
-  it("1단계 DB(user_version 1)는 열 때 입금·잔액 테이블이 붙고 기존 데이터는 그대로", async () => {
+  it("1단계 DB(user_version 1)는 열 때 입금·잔액·거래 테이블이 붙고 기존 데이터는 그대로", async () => {
     const dir = mkdtempSync(join(tmpdir(), "moneylog-"));
     try {
       const path = join(dir, "v1.db");
       const a = openDb(path);
       a.exec("INSERT INTO item (account_id, name, amount, cycle) VALUES (3, '월세', 550000, 'monthly')");
-      a.exec("DROP TABLE deposit; DROP TABLE balance; PRAGMA user_version = 1;");
+      a.exec("DROP TABLE deposit; DROP TABLE balance; DROP TABLE spend; PRAGMA user_version = 1;");
       a.close();
       const b = openDb(path);
-      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 2 });
+      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 3 });
+      expect(b.prepare("SELECT COUNT(*) AS n FROM spend").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT COUNT(*) AS n FROM deposit").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT COUNT(*) AS n FROM balance").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT name FROM item").all()).toEqual([expect.objectContaining({ name: "월세" })]);

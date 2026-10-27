@@ -71,6 +71,27 @@ export interface Balance {
 
 export type BalanceInput = Pick<Balance, "kind" | "name" | "amount" | "memo">;
 
+/** 생활비 거래 한 건 (보기 전용 — "필요한 돈" 계산에 안 들어간다). 환불·취소는 음수 */
+export interface Spend {
+  id: number;
+  /** YYYY-MM-DD */
+  date: string;
+  /** HH:MM, 모르면 null */
+  time: string | null;
+  amount: number;
+  category: SpendCategory;
+  merchant: string;
+  /** 어디서 나갔나 (예: 신한카드 신용, 토스) */
+  source: string;
+  /** 같은 거래를 두 번 넣지 않게 하는 키 (파일의 승인번호·시각 등) */
+  ref: string | null;
+}
+
+export type SpendInput = Omit<Spend, "id">;
+
+export const SPEND_CATEGORIES = ["식비", "카페·간식", "편의점", "쇼핑", "구독·IT", "게임", "병원", "교통", "밥값 송금", "기타"] as const;
+export type SpendCategory = (typeof SPEND_CATEGORIES)[number];
+
 export interface Settings {
   /** 기간 시작일(1~28). 1 이면 달력 월, 25 면 25일 ~ 다음 달 24일 (월급일 기준) */
   startDay: number;

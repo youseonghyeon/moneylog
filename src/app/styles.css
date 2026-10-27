@@ -35,18 +35,13 @@ body {
   font: 15px/1.45 "Pretendard Variable", Pretendard, system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
 }
-body.locked {
-  overflow: hidden;
-}
 h1,
 h2,
 h3 {
   margin: 0;
   font-weight: 600;
 }
-button,
-input,
-select {
+button {
   font: inherit;
   color: inherit;
 }
@@ -55,7 +50,7 @@ select {
 .sum,
 .transfer b,
 .date,
-.money input {
+.cats b {
   font-variant-numeric: tabular-nums;
 }
 
@@ -67,18 +62,6 @@ button {
   padding: 8px 14px;
   cursor: pointer;
 }
-button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-button.danger {
-  color: var(--error);
-}
 button.icon {
   border: 0;
   background: none;
@@ -87,15 +70,7 @@ button.icon {
   line-height: 1;
   color: var(--ink-2);
 }
-button.link {
-  border: 0;
-  background: none;
-  padding: 0;
-  color: var(--accent);
-  align-self: flex-start;
-}
-
-/* 윗줄: ‹ 기간 › 설정 */
+/* 윗줄: ‹ 기간 › */
 .top {
   position: sticky;
   top: 0;
@@ -119,11 +94,6 @@ button.link {
   font-size: 13px;
   color: var(--ink-2);
 }
-.top .settings {
-  margin-left: auto;
-  font-size: 14px;
-}
-
 .layout {
   display: grid;
   gap: 16px;
@@ -240,9 +210,6 @@ button.link {
   padding: 11px 16px;
   text-align: left;
 }
-.line:hover {
-  background: var(--surface-2);
-}
 .line.past {
   color: var(--ink-2);
 }
@@ -300,10 +267,6 @@ button.link {
 .left > span:last-child {
   font-weight: 600;
 }
-.adds {
-  display: flex;
-  flex-wrap: wrap;
-}
 .kind h3 {
   display: flex;
   justify-content: space-between;
@@ -318,19 +281,97 @@ button.link {
   color: var(--ink-2);
   font-size: 14px;
 }
-.add {
-  display: block;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  padding: 10px 16px;
-  font-size: 14px;
-}
 .idle summary {
   padding: 10px 16px;
   cursor: pointer;
   color: var(--ink-2);
   font-size: 14px;
+}
+
+/* 계획 | 지출 탭 */
+.tabs {
+  display: flex;
+  gap: 4px;
+  max-width: 1040px;
+  margin: 12px auto 0;
+  padding: 0 16px;
+}
+.tabs button {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  padding: 8px 0;
+}
+.tabs button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+@media (min-width: 860px) {
+  .tabs button {
+    flex: 0 0 120px;
+  }
+}
+
+/* 지출: 분류별 막대 */
+.cats {
+  list-style: none;
+  margin: 6px 0 12px;
+  padding: 0;
+}
+.cats li {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+.bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--ink-2);
+}
+.cats b {
+  font-weight: 600;
+  text-align: right;
+}
+/* 지출: 날짜별 (누르면 그날 거래) */
+.days details + details {
+  border-top: 1px solid var(--line);
+}
+.days summary {
+  list-style: none;
+  cursor: pointer;
+}
+.days summary::-webkit-details-marker {
+  display: none;
+}
+.days .count {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.days details[open] summary {
+  font-weight: 600;
+}
+.line.sub {
+  padding-left: 28px;
+  font-size: 14px;
+}
+.note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.amt.refund {
+  color: var(--ink-2);
 }
 
 /* 넓은 화면: 요약을 왼쪽에 붙여 둔다 */
@@ -347,164 +388,10 @@ button.link {
   }
 }
 
-/* 시트: 모바일은 아래에서, 넓은 화면은 가운데 */
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  background: rgb(0 0 0 / 0.35);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-.sheet {
-  width: 100%;
-  max-height: 92dvh;
-  overflow-y: auto;
-  background: var(--surface);
-  border-radius: 16px 16px 0 0;
-  padding: 4px 16px calc(16px + env(safe-area-inset-bottom));
-}
-@media (min-width: 640px) {
-  .backdrop {
-    align-items: center;
-  }
-  .sheet {
-    width: 480px;
-    border-radius: 16px;
-    padding-bottom: 16px;
-  }
-}
-.sheet-head {
-  position: sticky;
-  top: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  background: var(--surface);
-}
-.sheet-head h2 {
-  font-size: 17px;
-}
-
-/* 폼 */
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-}
-.field > span {
-  font-size: 12px;
-  color: var(--ink-2);
-}
-.field.narrow {
-  flex: 0 0 96px;
-}
-.field input,
-.field select,
-.account-edit input {
-  width: 100%;
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-2);
-  /* iOS 는 16px 미만 입력칸에 포커스하면 화면을 확대한다 */
-  font-size: 16px;
-}
-.money {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.money input {
-  text-align: right;
-}
-.money > span {
-  color: var(--ink-2);
-}
-.row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-.align-end {
-  align-self: flex-end;
-  padding: 10px 16px;
-}
-.check {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 14px;
-}
-.check input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
-}
-.seg {
-  display: flex;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 2px;
-}
-.seg button {
-  flex: 1;
-  border: 0;
-  background: none;
-  padding: 8px 10px;
-  border-radius: 6px;
-  color: var(--ink-2);
-}
-.seg button.on {
-  background: var(--surface);
-  color: var(--ink);
-  font-weight: 600;
-}
-.actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding-top: 4px;
-}
-.grow {
-  flex: 1;
-}
-.group h3 {
-  font-size: 14px;
-}
 .hint {
   margin: 4px 0 10px;
   font-size: 13px;
   color: var(--ink-2);
-}
-.account-edit {
-  list-style: none;
-  margin: 8px 0 12px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.account-edit li {
-  display: flex;
-  gap: 8px;
-}
-.account-edit li input:first-child {
-  flex: 3;
-}
-.account-edit li input:nth-child(2) {
-  flex: 2;
 }
 .error {
   margin: 0;

@@ -2,12 +2,12 @@ import type { BalanceKind, Item } from "../core/types.ts";
 
 export const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
-/** 금액 입력칸: 숫자만 남겨 쉼표를 붙인다 */
-export const digits = (s: string) => s.replace(/[^\d]/g, "");
-export const withCommas = (s: string) => (digits(s) ? Number(digits(s)).toLocaleString("ko-KR") : "");
-
 /** 2026-10-25 → 10.25 */
 export const shortDate = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`;
+
+/** 2026-10-27 → 10.27 (화) */
+export const dayText = (d: string) =>
+  `${shortDate(d)} (${"일월화수목금토"[new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))).getUTCDay()]})`;
 
 /** 올해면 10.25, 아니면 2025.10.25 (잔액 기준일처럼 오래 묵을 수 있는 날짜) */
 export const dateText = (d: string) =>

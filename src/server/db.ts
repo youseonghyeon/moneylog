@@ -1,7 +1,7 @@
 // SQLite 저장소 (node:sqlite, 파일 하나). 운영에서는 PVC 위 /data/moneylog.db.
 // 스키마 변경은 MIGRATIONS 끝에 붙이고 PRAGMA user_version 으로 어디까지 적용했는지 센다.
 import { DatabaseSync } from "node:sqlite";
-import type { Account, Balance, BalanceInput, Deposit, DepositInput, Item, ItemInput, Override, Settings } from "../core/types.ts";
+import type { Account, Balance, BalanceInput, Deposit, DepositInput, Item, ItemInput, Override, Settings, Spend, SpendCategory, SpendInput } from "../core/types.ts";
 
 export type Db = DatabaseSync;
 
@@ -54,6 +54,19 @@ const MIGRATIONS = [
     memo TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL
   );
+  `,
+  `
+  CREATE TABLE spend (
+    id INTEGER PRIMARY KEY,
+    date TEXT NOT NULL,
+    time TEXT,
+    amount INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    merchant TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    ref TEXT UNIQUE
+  );
+  CREATE INDEX spend_date ON spend (date);
   `,
 ];
 
@@ -270,4 +283,34 @@ export function updateBalance(db: Db, id: number, b: BalanceInput, today: string
 
 export function deleteBalance(db: Db, id: number): boolean {
   return db.prepare("DELETE FROM balance WHERE id = ?").run(id).changes > 0;
+}
+
+const toSpend = (r: Row): Spend => ({
+  id: Number(r.id),
+  date: String(r.date),
+  time: r.time == null ? null : String(r.time),
+  amount: Number(r.amount),
+  category: String(r.category) as SpendCategory,
+  merchant: String(r.merchant),
+  source: String(r.source),
+  ref: r.ref == null ? null : String(r.ref),
+});
+
+export function listSpends(db: Db, start: string, end: string): Spend[] {
+  return (db.prepare("SELECT * FROM spend WHERE date BETWEEN ? AND ? ORDER BY date, time, id").all(start, end) as Row[]).map(toSpend);
+}
+
+/** 같은 ref 가 이미 있으면 null (두 번 넣지 않는다) */
+export function createSpend(db: Db, s: SpendInput): Spend | null {
+  const r = db
+    .prepare(
+      "INSERT INTO spend (date, time, amount, category, merchant, source, ref) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (ref) DO NOTHING",
+    )
+    .run(s.date, s.time, s.amount, s.category, s.merchant, s.source, s.ref);
+  if (r.changes === 0) return null;
+  return toSpend(db.prepare("SELECT * FROM spend WHERE id = ?").get(Number(r.lastInsertRowid)) as Row);
+}
+
+export function deleteSpend(db: Db, id: number): boolean {
+  return db.prepare("DELETE FROM spend WHERE id = ?").run(id).changes > 0;
 }

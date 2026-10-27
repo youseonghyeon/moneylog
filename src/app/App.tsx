@@ -1,41 +1,35 @@
-// 한 화면: 기간 이동 · 계좌별 넣어 둘 금액 · 계좌마다 입금·항목 목록 · 이번 기간에 안 나가는 항목 · 주식·적금·대출 잔액
+// 한 화면, 탭 둘. 보기 전용 — 입력은 사용자 대신 에이전트가 API 로 넣는다(사용자 결정 2026-10-27).
+// 계획: 기간 이동 · 계좌별 넣어 둘 금액 · 계좌마다 입금·항목 · 이번 기간에 안 나가는 항목 · 주식·적금·대출 잔액
+// 지출: 그 기간 생활비 거래 — 분류별·날짜별
 import { useEffect, useState } from "preact/hooks";
 import { labelOf, shiftLabel } from "../core/period.ts";
-import type { Balance, BalanceKind, Deposit, Item, Plan, PlanLine, Settings } from "../core/types.ts";
+import type { Balance, Item, Plan, Settings, Spend } from "../core/types.ts";
 import { api } from "./api.ts";
-import { BalanceSheet } from "./BalanceSheet.tsx";
-import { DepositSheet } from "./DepositSheet.tsx";
 import { dateText, KIND_NAMES, labelText, leftText, scheduleText, shortDate, todayStr, won } from "./format.ts";
-import { ItemSheet } from "./ItemSheet.tsx";
-import { SettingsSheet } from "./SettingsSheet.tsx";
+import { SpendView } from "./SpendView.tsx";
 
-type Open =
-  | { kind: "item"; item: Item | null; accountId: number; actual: number | null }
-  | { kind: "deposit"; deposit: Deposit | null; accountId: number }
-  | { kind: "balance"; balance: Balance | null; balanceKind: BalanceKind }
-  | { kind: "settings" }
-  | null;
+type Tab = "plan" | "spend";
+const tabOf = (): Tab => (location.hash === "#spend" ? "spend" : "plan");
 
 export function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [spends, setSpends] = useState<Spend[]>([]);
   const [error, setError] = useState("");
-  const [open, setOpen] = useState<Open>(null);
+  const [tab, setTab] = useState<Tab>(tabOf);
 
   async function load(label?: string) {
     try {
       const s = await api.settings();
-      const [p, its, bs] = await Promise.all([
-        api.plan(label ?? labelOf(todayStr(), s.startDay)),
-        api.items(),
-        api.balances(),
-      ]);
+      const l = label ?? labelOf(todayStr(), s.startDay);
+      const [p, its, bs, sp] = await Promise.all([api.plan(l), api.items(), api.balances(), api.spends(l)]);
       setSettings(s);
       setPlan(p);
       setItems(its);
       setBalances(bs);
+      setSpends(sp);
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -44,6 +38,9 @@ export function App() {
 
   useEffect(() => {
     load();
+    const onHash = () => setTab(tabOf());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
   if (!plan || !settings) {
@@ -51,18 +48,9 @@ export function App() {
   }
 
   const label = plan.period.label;
-  const accounts = plan.accounts.map((a) => a.account);
-  const today = todayStr();
-  const estimated = plan.accounts.flatMap((a) => a.lines).filter((l) => l.estimated).length;
-  const due = new Set(plan.accounts.flatMap((a) => a.lines.map((l) => l.item.id)));
-  const idle = items.filter((it) => !due.has(it.id));
-  const accountName = new Map(accounts.map((a) => [a.id, a.name]));
-
-  const editLine = (l: PlanLine) =>
-    setOpen({ kind: "item", item: l.item, accountId: l.item.accountId, actual: l.estimated || !l.item.variable ? null : l.amount });
-  const reload = () => {
-    setOpen(null);
-    load(label);
+  const go = (t: Tab) => {
+    history.replaceState(null, "", t === "spend" ? "#spend" : location.pathname);
+    setTab(t);
   };
 
   return (
@@ -80,10 +68,15 @@ export function App() {
         <button type="button" class="icon" aria-label="다음 기간" onClick={() => load(shiftLabel(label, 1))}>
           ›
         </button>
-        <button type="button" class="icon settings" aria-label="설정" onClick={() => setOpen({ kind: "settings" })}>
-          설정
-        </button>
       </header>
+
+      <nav class="tabs" role="tablist">
+        {(["plan", "spend"] as const).map((t) => (
+          <button type="button" role="tab" aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => go(t)}>
+            {t === "plan" ? "계획" : "지출"}
+          </button>
+        ))}
+      </nav>
 
       {error && (
         <p class="error banner" role="alert">
@@ -91,214 +84,156 @@ export function App() {
         </p>
       )}
 
-      <main class="layout">
-        <aside class="summary">
-          <p class="caption">이번 기간에 필요한 돈</p>
-          <p class="total">{won(plan.total)}</p>
-          {estimated > 0 && <p class="hint">예상 금액 {estimated}건 포함 — 고지서가 오면 실제 금액을 넣어 주세요</p>}
-          {plan.deposited > 0 && (
-            <p class="put">
-              넣은 돈 {won(plan.deposited)} · <Left value={plan.deposited - plan.total} />
-            </p>
-          )}
-          <h3>계좌별로 넣어 둘 금액</h3>
-          <ul class="transfer">
-            {plan.accounts.map((a) => (
-              <li>
-                <span>
-                  {a.account.name}
-                  {a.account.memo && <small>{a.account.memo}</small>}
-                </span>
-                <span class="need">
-                  <b>{won(a.total)}</b>
-                  {a.deposits.length > 0 && (
-                    <small>
-                      넣음 {won(a.deposited)} · <Left value={a.deposited - a.total} />
-                    </small>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </aside>
+      {tab === "plan" ? (
+        <PlanView plan={plan} items={items} balances={balances} />
+      ) : (
+        <SpendView spends={spends} period={plan.period} />
+      )}
+    </div>
+  );
+}
 
-        <div class="detail">
+function PlanView({ plan, items, balances }: { plan: Plan; items: Item[]; balances: Balance[] }) {
+  const today = todayStr();
+  const estimated = plan.accounts.flatMap((a) => a.lines).filter((l) => l.estimated).length;
+  const due = new Set(plan.accounts.flatMap((a) => a.lines.map((l) => l.item.id)));
+  const idle = items.filter((it) => !due.has(it.id));
+  const accountName = new Map(plan.accounts.map((a) => [a.account.id, a.account.name]));
+
+  return (
+    <main class="layout">
+      <aside class="summary">
+        <p class="caption">이번 기간에 필요한 돈</p>
+        <p class="total">{won(plan.total)}</p>
+        {estimated > 0 && <p class="hint">예상 금액 {estimated}건 포함</p>}
+        {plan.deposited > 0 && (
+          <p class="put">
+            넣은 돈 {won(plan.deposited)} · <Left value={plan.deposited - plan.total} />
+          </p>
+        )}
+        <h3>계좌별로 넣어 둘 금액</h3>
+        <ul class="transfer">
           {plan.accounts.map((a) => (
-            <section class="acct" aria-label={a.account.name}>
-              <header>
-                <h2>{a.account.name}</h2>
-                <span class="sum">{won(a.total)}</span>
-              </header>
-              {a.deposits.length > 0 && (
-                <ul class="lines deposits">
-                  {a.deposits.map((d) => (
-                    <li>
-                      <button
-                        type="button"
-                        class="line"
-                        onClick={() => setOpen({ kind: "deposit", deposit: d, accountId: d.accountId })}
-                      >
-                        <span class="date">{shortDate(d.date)}</span>
-                        <span class="name">
-                          입금
-                          {d.memo && <small>{d.memo}</small>}
-                        </span>
-                        <span class="amt">+{won(d.amount)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {a.lines.length === 0 ? (
-                <p class="empty">이번 기간에 나가는 항목이 없습니다.</p>
-              ) : (
-                <ul class="lines">
-                  {a.lines.map((l) => (
-                    <li>
-                      <button type="button" class={l.due < today ? "line past" : "line"} onClick={() => editLine(l)}>
-                        <span class="date">{shortDate(l.due)}</span>
-                        <span class="name">
-                          {l.item.name}
-                          {l.estimated && <em>예상</em>}
-                          {l.item.cycle === "yearly" && <em class="muted">매년</em>}
-                        </span>
-                        <span class="amt">{won(l.amount)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {a.deposits.length > 0 && (
-                <p class="left">
-                  <span>넣은 돈 {won(a.deposited)} − 나갈 돈 {won(a.total)}</span>
-                  <Left value={a.deposited - a.total} />
-                </p>
-              )}
-              <div class="adds">
-                <button
-                  type="button"
-                  class="add"
-                  onClick={() => setOpen({ kind: "item", item: null, accountId: a.account.id, actual: null })}
-                >
-                  + {a.account.name}에 항목 추가
-                </button>
-                <button
-                  type="button"
-                  class="add"
-                  onClick={() => setOpen({ kind: "deposit", deposit: null, accountId: a.account.id })}
-                >
-                  + 입금
-                </button>
-              </div>
-            </section>
+            <li>
+              <span>
+                {a.account.name}
+                {a.account.memo && <small>{a.account.memo}</small>}
+              </span>
+              <span class="need">
+                <b>{won(a.total)}</b>
+                {a.deposits.length > 0 && (
+                  <small>
+                    넣음 {won(a.deposited)} · <Left value={a.deposited - a.total} />
+                  </small>
+                )}
+              </span>
+            </li>
           ))}
+        </ul>
+      </aside>
 
-          {idle.length > 0 && (
-            <details class="idle">
-              <summary>이번 기간에 안 나가는 항목 {idle.length}개</summary>
-              <ul class="lines">
-                {idle.map((it) => (
-                  <li>
-                    <button
-                      type="button"
-                      class="line"
-                      onClick={() => setOpen({ kind: "item", item: it, accountId: it.accountId, actual: null })}
-                    >
-                      <span class="name">
-                        {it.name}
-                        <small>
-                          {accountName.get(it.accountId)} · {scheduleText(it)}
-                        </small>
-                      </span>
-                      <span class="amt">{won(it.amount)}</span>
-                    </button>
+      <div class="detail">
+        {plan.accounts.map((a) => (
+          <section class="acct" aria-label={a.account.name}>
+            <header>
+              <h2>{a.account.name}</h2>
+              <span class="sum">{won(a.total)}</span>
+            </header>
+            {a.deposits.length > 0 && (
+              <ul class="lines deposits">
+                {a.deposits.map((d) => (
+                  <li class="line">
+                    <span class="date">{shortDate(d.date)}</span>
+                    <span class="name">
+                      입금
+                      {d.memo && <small>{d.memo}</small>}
+                    </span>
+                    <span class="amt">+{won(d.amount)}</span>
                   </li>
                 ))}
               </ul>
-            </details>
-          )}
-
-          <section class="acct" aria-label="주식·적금·대출">
-            <header>
-              <h2>주식·적금·대출</h2>
-            </header>
-            {balances.length === 0 ? (
-              <p class="empty">지금 얼마 들어 있는지(대출은 남은 원금) 적어 두면 여기 모입니다.</p>
-            ) : (
-              (["stock", "saving", "loan"] as const).map((k) => {
-                const bs = balances.filter((b) => b.kind === k);
-                if (bs.length === 0) return null;
-                return (
-                  <div class="kind" aria-label={KIND_NAMES[k]}>
-                    <h3>
-                      <span>{KIND_NAMES[k]}</span>
-                      <span class="sum">{won(bs.reduce((s, b) => s + b.amount, 0))}</span>
-                    </h3>
-                    <ul class="lines">
-                      {bs.map((b) => (
-                        <li>
-                          <button
-                            type="button"
-                            class="line"
-                            onClick={() => setOpen({ kind: "balance", balance: b, balanceKind: b.kind })}
-                          >
-                            <span class="name">
-                              {b.name}
-                              <small>{[b.memo, `${dateText(b.updatedAt)} 기준`].filter(Boolean).join(" · ")}</small>
-                            </span>
-                            <span class="amt">{won(b.amount)}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })
             )}
-            <button
-              type="button"
-              class="add"
-              onClick={() => setOpen({ kind: "balance", balance: null, balanceKind: "stock" })}
-            >
-              + 주식·적금·대출 추가
-            </button>
+            {a.lines.length === 0 ? (
+              <p class="empty">이번 기간에 나가는 항목이 없습니다.</p>
+            ) : (
+              <ul class="lines">
+                {a.lines.map((l) => (
+                  <li class={l.due < today ? "line past" : "line"}>
+                    <span class="date">{shortDate(l.due)}</span>
+                    <span class="name">
+                      {l.item.name}
+                      {l.estimated && <em>예상</em>}
+                      {l.item.cycle === "yearly" && <em class="muted">매년</em>}
+                    </span>
+                    <span class="amt">{won(l.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {a.deposits.length > 0 && (
+              <p class="left">
+                <span>
+                  넣은 돈 {won(a.deposited)} − 나갈 돈 {won(a.total)}
+                </span>
+                <Left value={a.deposited - a.total} />
+              </p>
+            )}
           </section>
-        </div>
-      </main>
+        ))}
 
-      {open?.kind === "item" && (
-        <ItemSheet
-          item={open.item}
-          accounts={accounts}
-          defaultAccountId={open.accountId}
-          period={label}
-          actual={open.actual}
-          onDone={reload}
-          onClose={() => setOpen(null)}
-        />
-      )}
-      {open?.kind === "deposit" && (
-        <DepositSheet
-          deposit={open.deposit}
-          accounts={accounts}
-          defaultAccountId={open.accountId}
-          period={plan.period}
-          onDone={reload}
-          onClose={() => setOpen(null)}
-        />
-      )}
-      {open?.kind === "balance" && (
-        <BalanceSheet balance={open.balance} kind={open.balanceKind} onDone={reload} onClose={() => setOpen(null)} />
-      )}
-      {open?.kind === "settings" && (
-        <SettingsSheet
-          startDay={settings.startDay}
-          accounts={accounts}
-          onChanged={() => load(label)}
-          onClose={() => setOpen(null)}
-        />
-      )}
-    </div>
+        {idle.length > 0 && (
+          <details class="idle">
+            <summary>이번 기간에 안 나가는 항목 {idle.length}개</summary>
+            <ul class="lines">
+              {idle.map((it) => (
+                <li class="line">
+                  <span class="name">
+                    {it.name}
+                    <small>
+                      {accountName.get(it.accountId)} · {scheduleText(it)}
+                    </small>
+                  </span>
+                  <span class="amt">{won(it.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
+        <section class="acct" aria-label="주식·적금·대출">
+          <header>
+            <h2>주식·적금·대출</h2>
+          </header>
+          {balances.length === 0 ? (
+            <p class="empty">아직 적어 둔 잔액이 없습니다.</p>
+          ) : (
+            (["stock", "saving", "loan"] as const).map((k) => {
+              const bs = balances.filter((b) => b.kind === k);
+              if (bs.length === 0) return null;
+              return (
+                <div class="kind" aria-label={KIND_NAMES[k]}>
+                  <h3>
+                    <span>{KIND_NAMES[k]}</span>
+                    <span class="sum">{won(bs.reduce((s, b) => s + b.amount, 0))}</span>
+                  </h3>
+                  <ul class="lines">
+                    {bs.map((b) => (
+                      <li class="line">
+                        <span class="name">
+                          {b.name}
+                          <small>{[b.memo, `${dateText(b.updatedAt)} 기준`].filter(Boolean).join(" · ")}</small>
+                        </span>
+                        <span class="amt">{won(b.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })
+          )}
+        </section>
+      </div>
+    </main>
   );
 }
 

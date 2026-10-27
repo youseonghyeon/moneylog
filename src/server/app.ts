@@ -2,9 +2,9 @@
 // 실패 응답은 { error } — 화면이 문구를 그대로 보여 준다.
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { isLabel } from "../core/period.ts";
+import { isLabel, periodOf } from "../core/period.ts";
 import { buildPlan } from "../core/plan.ts";
-import { checkAmount, checkBalance, checkDeposit, checkItem, checkName } from "../core/validate.ts";
+import { checkAmount, checkBalance, checkDeposit, checkItem, checkName, checkSpend } from "../core/validate.ts";
 import * as store from "./db.ts";
 import type { Db } from "./db.ts";
 
@@ -159,6 +159,27 @@ export function createApp(db: Db, today: () => string = localToday): Hono {
   app.delete("/api/balances/:id", (c) => {
     const id = idParam(c);
     if (!id || !store.deleteBalance(db, id)) return bad(c, "잔액 기록이 없습니다. 화면을 새로 고쳐 주세요.", 404);
+    return c.body(null, 204);
+  });
+
+  // 생활비 거래 (보기 전용 — 계획 합계에 안 들어간다)
+  app.get("/api/spends", (c) => {
+    const period = c.req.query("period");
+    if (!isLabel(period)) return bad(c, "period 쿼리가 필요합니다 (예: ?period=2026-10).");
+    const p = periodOf(period, store.getSettings(db).startDay);
+    return c.json(store.listSpends(db, p.start, p.end));
+  });
+
+  app.post("/api/spends", async (c) => {
+    const r = checkSpend(await body(c));
+    if (!r.ok) return bad(c, r.error);
+    const s = store.createSpend(db, r.value);
+    return s ? c.json(s, 201) : bad(c, `이미 넣은 거래입니다 (ref ${r.value.ref}). 다시 넣지 않았습니다.`, 409);
+  });
+
+  app.delete("/api/spends/:id", (c) => {
+    const id = idParam(c);
+    if (!id || !store.deleteSpend(db, id)) return bad(c, "거래가 없습니다. 화면을 새로 고쳐 주세요.", 404);
     return c.body(null, 204);
   });
 
