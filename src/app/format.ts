@@ -1,4 +1,4 @@
-import type { Item } from "../core/types.ts";
+import type { BalanceKind, Item } from "../core/types.ts";
 
 export const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
@@ -8,6 +8,15 @@ export const withCommas = (s: string) => (digits(s) ? Number(digits(s)).toLocale
 
 /** 2026-10-25 → 10.25 */
 export const shortDate = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`;
+
+/** 올해면 10.25, 아니면 2025.10.25 (잔액 기준일처럼 오래 묵을 수 있는 날짜) */
+export const dateText = (d: string) =>
+  d.slice(0, 4) === todayStr().slice(0, 4) ? shortDate(d) : `${d.slice(0, 4)}.${shortDate(d)}`;
+
+/** 넣은 돈 − 나갈 돈 → "남음 …" / "부족 …" */
+export const leftText = (left: number) => (left < 0 ? `부족 ${won(-left)}` : `남음 ${won(left)}`);
+
+export const KIND_NAMES: Record<BalanceKind, string> = { stock: "주식", saving: "적금", loan: "대출" };
 
 /** 2026-10 → 2026년 10월 */
 export const labelText = (label: string) => `${label.slice(0, 4)}년 ${Number(label.slice(5, 7))}월`;

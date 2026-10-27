@@ -1,5 +1,5 @@
 // 브라우저 스모크: 운영과 같은 서버(node src/server/main.ts — dist + /api)를 빈 임시 DB 로 띄워
-// 항목 추가·변동 금액·매년 항목·검사 오류·설정·계좌 삭제 거부를 실제 브라우저로 확인한다. 스크린샷은 .shots/.
+// 항목 추가·변동 금액·입금·매년 항목·주식·적금·대출·검사 오류·설정·계좌 삭제 거부를 실제 브라우저로 확인한다. 스크린샷은 .shots/.
 // 실행: npm run ui-check   (포트 5299 — 사용자의 5173·8787 과 겹치지 않게)
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -60,7 +60,7 @@ try {
   const acct = (name) => page.locator(`section.acct[aria-label="${name}"]`);
   const sheet = page.locator(".sheet");
   async function addItem(account, { name, amount, day, variable, yearlyMonth }) {
-    await acct(account).locator("button.add").click();
+    await acct(account).getByRole("button", { name: /항목 추가/ }).click();
     await sheet.getByLabel("이름").fill(name);
     await sheet.locator(".money input").first().fill(String(amount));
     if (variable) await sheet.getByText("달마다 금액이 바뀜").click();
@@ -94,10 +94,37 @@ try {
   check((await total()) === "1,531,230원", "실제 금액 반영 → 1,531,230원");
   check((await page.locator(".summary .hint").count()) === 0, "예상 건수 안내가 사라진다");
 
+  // 입금: 계좌별 넣은 돈 − 나갈 돈
+  async function deposit(account, amount, memo) {
+    await acct(account).getByRole("button", { name: "+ 입금" }).click();
+    await sheet.locator(".money input").fill(String(amount));
+    if (memo) await sheet.getByLabel("메모").fill(memo);
+    await sheet.getByRole("button", { name: "저장" }).click();
+    await sheet.waitFor({ state: "detached" });
+  }
+  await acct("생활비").getByRole("button", { name: "+ 입금" }).click();
+  await sheet.getByRole("button", { name: "저장" }).click();
+  check((await sheet.locator(".error").innerText()).includes("금액은"), "빈 입금 금액 → 오류 문구");
+  await sheet.getByRole("button", { name: "취소" }).click();
+  await deposit("생활비", 800000, "월급");
+  await deposit("대출·고지서", 300000);
+  check((await acct("생활비").locator(".left").innerText()).includes("남음 200,000원"), "생활비 800,000 − 600,000 → 남음 200,000원");
+  check((await acct("대출·고지서").locator(".left .short").innerText()) === "부족 81,230원", "대출·고지서 300,000 − 381,230 → 부족 81,230원 (오류색)");
+  check((await page.locator(".summary .put").innerText()).includes("넣은 돈 1,100,000원 · 부족 431,230원"), "요약: 넣은 돈·부족");
+  check((await total()) === "1,531,230원", "입금은 필요한 돈 합계를 바꾸지 않는다");
+  await acct("대출·고지서").locator(".deposits .line").click();
+  await page.screenshot({ path: `${OUT}/03b-deposit-sheet-mobile.png` });
+  await sheet.locator(".money input").fill("400000");
+  await sheet.getByRole("button", { name: "저장" }).click();
+  await sheet.waitFor({ state: "detached" });
+  check((await acct("대출·고지서").locator(".left").innerText()).includes("남음 18,770원"), "입금 수정 → 남음 18,770원");
+  await page.screenshot({ path: `${OUT}/02b-deposits-mobile.png`, fullPage: true });
+
   // 다음 기간엔 예상으로 돌아간다
   await page.getByLabel("다음 기간").click();
   await page.waitForFunction(() => document.querySelector(".total")?.textContent === "1,520,000원");
   check(true, "다음 기간은 예상 금액으로 1,520,000원");
+  check((await page.locator(".summary .put").count()) === 0 && (await page.locator(".left").count()) === 0, "다음 기간엔 이번 기간 입금이 안 보인다");
   await page.getByLabel("이전 기간").click();
   await page.waitForFunction(() => document.querySelector(".total")?.textContent === "1,531,230원");
 
@@ -108,8 +135,34 @@ try {
   check((await page.locator(".idle summary").innerText()).includes("1개"), "다른 달 매년 항목은 '안 나가는 항목'");
   check((await total()) === "1,531,230원", "다른 달 매년 항목은 합계에 안 든다");
 
+  // 주식·적금·대출 잔액
+  const bal = acct("주식·적금·대출");
+  async function addBalance(kind, name, amount) {
+    await bal.getByRole("button", { name: "+ 주식·적금·대출 추가" }).click();
+    await sheet.getByRole("radio", { name: kind }).click();
+    await sheet.getByLabel("이름").fill(name);
+    await sheet.locator(".money input").fill(String(amount));
+    await sheet.getByRole("button", { name: "저장" }).click();
+    await sheet.waitFor({ state: "detached" });
+  }
+  await addBalance("주식", "토스증권", 3200000);
+  await addBalance("대출", "전세대출", 120000000);
+  await addBalance("적금", "신한 적금", 1500000);
+  check(
+    (await bal.locator(".kind h3").allInnerTexts()).join("|").replace(/\s+/g, " ") === "주식 3,200,000원|적금 1,500,000원|대출 120,000,000원",
+    "잔액은 주식·적금·대출 순으로 묶인다",
+  );
+  check((await bal.locator(".kind").first().locator("small").innerText()).includes("기준"), "잔액에 기준일 표시");
+  await bal.getByText("토스증권").click();
+  await page.screenshot({ path: `${OUT}/03c-balance-sheet-mobile.png` });
+  await sheet.locator(".money input").fill("3050000");
+  await sheet.getByRole("button", { name: "저장" }).click();
+  await sheet.waitFor({ state: "detached" });
+  check((await bal.locator(".kind").first().locator(".sum").innerText()) === "3,050,000원", "주식 금액 수정");
+  check((await total()) === "1,531,230원", "잔액은 필요한 돈 합계에 안 든다");
+
   // 입력 오류는 시트 안에 문구로
-  await acct("생활비").locator("button.add").click();
+  await acct("생활비").getByRole("button", { name: /항목 추가/ }).click();
   await sheet.getByRole("button", { name: "저장" }).click();
   check((await sheet.locator(".error").innerText()).includes("이름을 넣어 주세요"), "빈 이름 → 오류 문구");
   await sheet.getByLabel("이름").fill("x");

@@ -1,7 +1,7 @@
 // SQLite 저장소 (node:sqlite, 파일 하나). 운영에서는 PVC 위 /data/moneylog.db.
 // 스키마 변경은 MIGRATIONS 끝에 붙이고 PRAGMA user_version 으로 어디까지 적용했는지 센다.
 import { DatabaseSync } from "node:sqlite";
-import type { Account, Item, ItemInput, Override, Settings } from "../core/types.ts";
+import type { Account, Balance, BalanceInput, Deposit, DepositInput, Item, ItemInput, Override, Settings } from "../core/types.ts";
 
 export type Db = DatabaseSync;
 
@@ -35,6 +35,25 @@ const MIGRATIONS = [
   CREATE TABLE setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   INSERT INTO account (name, sort) VALUES ('생활비', 0), ('대출·고지서', 1), ('고정 지출', 2);
   INSERT INTO setting (key, value) VALUES ('startDay', '1');
+  `,
+  `
+  CREATE TABLE deposit (
+    id INTEGER PRIMARY KEY,
+    account_id INTEGER NOT NULL REFERENCES account(id),
+    period TEXT NOT NULL,
+    date TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    memo TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX deposit_period ON deposit (period);
+  CREATE TABLE balance (
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    memo TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+  );
   `,
 ];
 
@@ -103,6 +122,10 @@ export function countItems(db: Db, accountId: number): number {
   return (db.prepare("SELECT COUNT(*) AS n FROM item WHERE account_id = ?").get(accountId) as { n: number }).n;
 }
 
+export function countDeposits(db: Db, accountId: number): number {
+  return (db.prepare("SELECT COUNT(*) AS n FROM deposit WHERE account_id = ?").get(accountId) as { n: number }).n;
+}
+
 export function deleteAccount(db: Db, id: number): boolean {
   return db.prepare("DELETE FROM account WHERE id = ?").run(id).changes > 0;
 }
@@ -168,4 +191,83 @@ export function setSettings(db: Db, s: Settings): void {
   db.prepare(
     "INSERT INTO setting (key, value) VALUES ('startDay', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
   ).run(String(s.startDay));
+}
+
+const toDeposit = (r: Row): Deposit => ({
+  id: Number(r.id),
+  accountId: Number(r.account_id),
+  period: String(r.period),
+  date: String(r.date),
+  amount: Number(r.amount),
+  memo: String(r.memo),
+});
+
+export function listDeposits(db: Db, period: string): Deposit[] {
+  return (db.prepare("SELECT * FROM deposit WHERE period = ? ORDER BY date, id").all(period) as Row[]).map(toDeposit);
+}
+
+export function getDeposit(db: Db, id: number): Deposit | null {
+  const r = db.prepare("SELECT * FROM deposit WHERE id = ?").get(id) as Row | undefined;
+  return r ? toDeposit(r) : null;
+}
+
+export function createDeposit(db: Db, d: DepositInput): Deposit {
+  const r = db
+    .prepare("INSERT INTO deposit (account_id, period, date, amount, memo) VALUES (?, ?, ?, ?, ?)")
+    .run(d.accountId, d.period, d.date, d.amount, d.memo);
+  return getDeposit(db, Number(r.lastInsertRowid))!;
+}
+
+export function updateDeposit(db: Db, id: number, d: DepositInput): Deposit | null {
+  db.prepare("UPDATE deposit SET account_id = ?, period = ?, date = ?, amount = ?, memo = ? WHERE id = ?").run(
+    d.accountId,
+    d.period,
+    d.date,
+    d.amount,
+    d.memo,
+    id,
+  );
+  return getDeposit(db, id);
+}
+
+export function deleteDeposit(db: Db, id: number): boolean {
+  return db.prepare("DELETE FROM deposit WHERE id = ?").run(id).changes > 0;
+}
+
+const toBalance = (r: Row): Balance => ({
+  id: Number(r.id),
+  kind: r.kind === "loan" ? "loan" : r.kind === "saving" ? "saving" : "stock",
+  name: String(r.name),
+  amount: Number(r.amount),
+  memo: String(r.memo),
+  updatedAt: String(r.updated_at),
+});
+
+export function listBalances(db: Db): Balance[] {
+  return (db.prepare("SELECT * FROM balance ORDER BY id").all() as Row[]).map(toBalance);
+}
+
+export function getBalance(db: Db, id: number): Balance | null {
+  const r = db.prepare("SELECT * FROM balance WHERE id = ?").get(id) as Row | undefined;
+  return r ? toBalance(r) : null;
+}
+
+export function createBalance(db: Db, b: BalanceInput, today: string): Balance {
+  const r = db
+    .prepare("INSERT INTO balance (kind, name, amount, memo, updated_at) VALUES (?, ?, ?, ?, ?)")
+    .run(b.kind, b.name, b.amount, b.memo, today);
+  return getBalance(db, Number(r.lastInsertRowid))!;
+}
+
+/** 금액이 바뀔 때만 기준일을 오늘로 옮긴다 (이름·메모만 고치면 그대로) */
+export function updateBalance(db: Db, id: number, b: BalanceInput, today: string): Balance | null {
+  db.prepare(
+    `UPDATE balance SET kind = ?, name = ?, memo = ?,
+       updated_at = CASE WHEN amount = ? THEN updated_at ELSE ? END, amount = ? WHERE id = ?`,
+  ).run(b.kind, b.name, b.memo, b.amount, today, b.amount, id);
+  return getBalance(db, id);
+}
+
+export function deleteBalance(db: Db, id: number): boolean {
+  return db.prepare("DELETE FROM balance WHERE id = ?").run(id).changes > 0;
 }

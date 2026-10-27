@@ -29,6 +29,15 @@ export function isLabel(s: unknown): s is string {
   return typeof s === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
 }
 
+/** 실제로 있는 날짜인가 (YYYY-MM-DD, 2월 30일 같은 날은 아님) */
+export function isDate(s: unknown): s is string {
+  if (typeof s !== "string") return false;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  return mo >= 1 && mo <= 12 && d >= 1 && d <= daysInMonth(y, mo);
+}
+
 export function shiftLabel(label: string, delta: number): string {
   const [y, m] = parseLabel(label);
   const [ny, nm] = norm(y, m + delta);

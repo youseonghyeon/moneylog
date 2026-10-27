@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { isLabel } from "../core/period.ts";
 import { buildPlan } from "../core/plan.ts";
-import { checkAmount, checkItem, checkName } from "../core/validate.ts";
+import { checkAmount, checkBalance, checkDeposit, checkItem, checkName } from "../core/validate.ts";
 import * as store from "./db.ts";
 import type { Db } from "./db.ts";
 
@@ -23,7 +23,13 @@ function idParam(c: Context, name = "id"): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-export function createApp(db: Db): Hono {
+/** 서버 시간대(운영은 TZ=Asia/Seoul)의 오늘 YYYY-MM-DD */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function createApp(db: Db, today: () => string = localToday): Hono {
   const app = new Hono();
 
   app.get("/api/plan", (c) => {
@@ -31,7 +37,8 @@ export function createApp(db: Db): Hono {
     if (!isLabel(period)) return bad(c, "period 쿼리가 필요합니다 (예: ?period=2026-10).");
     const { startDay } = store.getSettings(db);
     const items = store.listItems(db);
-    return c.json(buildPlan(period, startDay, store.listAccounts(db), items, store.listOverrides(db, period)));
+    const accounts = store.listAccounts(db);
+    return c.json(buildPlan(period, startDay, accounts, items, store.listOverrides(db, period), store.listDeposits(db, period)));
   });
 
   app.get("/api/accounts", (c) => c.json(store.listAccounts(db)));
@@ -56,7 +63,11 @@ export function createApp(db: Db): Hono {
     const id = idParam(c);
     if (!id || !store.getAccount(db, id)) return bad(c, "계좌가 없습니다. 화면을 새로 고쳐 주세요.", 404);
     const n = store.countItems(db, id);
-    if (n > 0) return bad(c, `이 계좌에 항목이 ${n}개 있습니다. 항목을 다른 계좌로 옮기거나 지운 뒤 다시 시도해 주세요.`, 409);
+    const m = store.countDeposits(db, id);
+    if (n > 0 || m > 0) {
+      const what = [n > 0 && `항목이 ${n}개`, m > 0 && `입금이 ${m}건`].filter(Boolean).join(", ");
+      return bad(c, `이 계좌에 ${what} 있습니다. 다른 계좌로 옮기거나 지운 뒤 다시 시도해 주세요.`, 409);
+    }
     store.deleteAccount(db, id);
     return c.body(null, 204);
   });
@@ -102,6 +113,52 @@ export function createApp(db: Db): Hono {
     const id = idParam(c);
     if (!id) return bad(c, "항목이 없습니다. 화면을 새로 고쳐 주세요.", 404);
     store.deleteOverride(db, id, c.req.param("period"));
+    return c.body(null, 204);
+  });
+
+  // 계좌에 넣은 돈 (기간에 묶임)
+  app.post("/api/deposits", async (c) => {
+    const r = checkDeposit(await body(c));
+    if (!r.ok) return bad(c, r.error);
+    if (!store.getAccount(db, r.value.accountId)) return bad(c, "고른 계좌가 없습니다. 계좌를 다시 골라 주세요.");
+    return c.json(store.createDeposit(db, r.value), 201);
+  });
+
+  app.put("/api/deposits/:id", async (c) => {
+    const id = idParam(c);
+    if (!id || !store.getDeposit(db, id)) return bad(c, "입금 기록이 없습니다. 화면을 새로 고쳐 주세요.", 404);
+    const r = checkDeposit(await body(c));
+    if (!r.ok) return bad(c, r.error);
+    if (!store.getAccount(db, r.value.accountId)) return bad(c, "고른 계좌가 없습니다. 계좌를 다시 골라 주세요.");
+    return c.json(store.updateDeposit(db, id, r.value));
+  });
+
+  app.delete("/api/deposits/:id", (c) => {
+    const id = idParam(c);
+    if (!id || !store.deleteDeposit(db, id)) return bad(c, "입금 기록이 없습니다. 화면을 새로 고쳐 주세요.", 404);
+    return c.body(null, 204);
+  });
+
+  // 주식·적금·대출 잔액
+  app.get("/api/balances", (c) => c.json(store.listBalances(db)));
+
+  app.post("/api/balances", async (c) => {
+    const r = checkBalance(await body(c));
+    if (!r.ok) return bad(c, r.error);
+    return c.json(store.createBalance(db, r.value, today()), 201);
+  });
+
+  app.put("/api/balances/:id", async (c) => {
+    const id = idParam(c);
+    if (!id || !store.getBalance(db, id)) return bad(c, "잔액 기록이 없습니다. 화면을 새로 고쳐 주세요.", 404);
+    const r = checkBalance(await body(c));
+    if (!r.ok) return bad(c, r.error);
+    return c.json(store.updateBalance(db, id, r.value, today()));
+  });
+
+  app.delete("/api/balances/:id", (c) => {
+    const id = idParam(c);
+    if (!id || !store.deleteBalance(db, id)) return bad(c, "잔액 기록이 없습니다. 화면을 새로 고쳐 주세요.", 404);
     return c.body(null, 204);
   });
 

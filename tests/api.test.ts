@@ -10,9 +10,12 @@ import type { Hono } from "hono";
 let db: Db;
 let app: Hono;
 
+let today = "2026-10-27";
+
 beforeEach(() => {
   db = openDb(":memory:");
-  app = createApp(db);
+  today = "2026-10-27";
+  app = createApp(db, () => today);
 });
 afterEach(() => db.close());
 
@@ -105,6 +108,67 @@ describe("API", () => {
     expect(plan.accounts[2].lines[0].due).toBe("2026-11-10");
   });
 
+  it("입금: 기간·계좌별 합계, 수정·삭제, 입금 있는 계좌는 못 지운다", async () => {
+    await call("POST", "/api/items", { ...rent, accountId: 1, name: "식비", amount: 600_000, day: 1 });
+    const dep = { accountId: 1, period: "2026-10", date: "2026-10-24", amount: 800_000, memo: "월급 하루 일찍" };
+    const c = await call("POST", "/api/deposits", dep);
+    expect(c.status).toBe(201);
+    let plan = (await call("GET", "/api/plan?period=2026-10")).json;
+    // 넣은 날이 기간 밖(시작 전날)이어도 고른 기간으로 센다
+    expect(plan.accounts[0]).toMatchObject({ total: 600_000, deposited: 800_000 });
+    expect(plan.accounts[0].deposits[0]).toMatchObject({ date: "2026-10-24", memo: "월급 하루 일찍" });
+    expect(plan.deposited).toBe(800_000);
+    expect((await call("GET", "/api/plan?period=2026-11")).json.deposited).toBe(0);
+
+    const u = await call("PUT", `/api/deposits/${c.json.id}`, { ...dep, accountId: 2, amount: 500_000 });
+    expect(u.json).toMatchObject({ accountId: 2, amount: 500_000 });
+    plan = (await call("GET", "/api/plan?period=2026-10")).json;
+    expect(plan.accounts.map((a: { deposited: number }) => a.deposited)).toEqual([0, 500_000, 0]);
+
+    const r = await call("DELETE", "/api/accounts/2");
+    expect(r.status).toBe(409);
+    expect(r.json.error).toMatch(/입금이 1건/);
+    expect((await call("DELETE", `/api/deposits/${c.json.id}`)).status).toBe(204);
+    expect((await call("DELETE", `/api/deposits/${c.json.id}`)).status).toBe(404);
+    expect((await call("DELETE", "/api/accounts/2")).status).toBe(204);
+  });
+
+  it("입금 입력 검사", async () => {
+    const dep = { accountId: 1, period: "2026-10", date: "2026-10-25", amount: 1 };
+    const cases: [unknown, RegExp, number][] = [
+      [{ ...dep, amount: 0 }, /0원/, 400],
+      [{ ...dep, amount: -5 }, /금액/, 400],
+      [{ ...dep, date: "2026-02-30" }, /넣은 날/, 400],
+      [{ ...dep, date: "" }, /넣은 날/, 400],
+      [{ ...dep, period: "2026-13" }, /기간/, 400],
+      [{ ...dep, accountId: 99 }, /계좌/, 400],
+      [null, /JSON 객체/, 400],
+    ];
+    for (const [b, msg, status] of cases) {
+      const r = await call("POST", "/api/deposits", b);
+      expect(r.status, JSON.stringify(b)).toBe(status);
+      expect(r.json.error).toMatch(msg);
+    }
+    expect((await call("PUT", "/api/deposits/99", dep)).status).toBe(404);
+  });
+
+  it("잔액(주식·적금·대출): 금액이 바뀔 때만 기준일이 바뀐다", async () => {
+    const c = await call("POST", "/api/balances", { kind: "stock", name: "토스증권", amount: 3_200_000 });
+    expect(c.status).toBe(201);
+    expect(c.json).toMatchObject({ kind: "stock", memo: "", updatedAt: "2026-10-27" });
+    today = "2026-11-03";
+    const same = await call("PUT", `/api/balances/${c.json.id}`, { kind: "stock", name: "토스증권 ISA", amount: 3_200_000, memo: "x" });
+    expect(same.json).toMatchObject({ name: "토스증권 ISA", memo: "x", updatedAt: "2026-10-27" });
+    const changed = await call("PUT", `/api/balances/${c.json.id}`, { kind: "stock", name: "토스증권 ISA", amount: 3_050_000 });
+    expect(changed.json).toMatchObject({ amount: 3_050_000, updatedAt: "2026-11-03" });
+    await call("POST", "/api/balances", { kind: "loan", name: "전세대출", amount: 120_000_000 });
+    expect((await call("GET", "/api/balances")).json.map((b: { kind: string }) => b.kind)).toEqual(["stock", "loan"]);
+    expect((await call("POST", "/api/balances", { kind: "cash", name: "a", amount: 1 })).json.error).toMatch(/종류/);
+    expect((await call("POST", "/api/balances", { kind: "saving", name: "", amount: 1 })).json.error).toMatch(/이름/);
+    expect((await call("DELETE", `/api/balances/${c.json.id}`)).status).toBe(204);
+    expect((await call("PUT", `/api/balances/${c.json.id}`, { kind: "stock", name: "a", amount: 1 })).status).toBe(404);
+  });
+
   it("period 없음·없는 API 는 JSON 오류", async () => {
     expect((await call("GET", "/api/plan")).status).toBe(400);
     const r = await call("GET", "/api/nope");
@@ -127,6 +191,25 @@ describe("DB 파일", () => {
       a.close();
       const b = openDb(path);
       expect(b.prepare("SELECT COUNT(*) AS n FROM account").get()).toEqual(expect.objectContaining({ n: 3 }));
+      expect(b.prepare("SELECT name FROM item").all()).toEqual([expect.objectContaining({ name: "월세" })]);
+      b.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("1단계 DB(user_version 1)는 열 때 입금·잔액 테이블이 붙고 기존 데이터는 그대로", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "moneylog-"));
+    try {
+      const path = join(dir, "v1.db");
+      const a = openDb(path);
+      a.exec("INSERT INTO item (account_id, name, amount, cycle) VALUES (3, '월세', 550000, 'monthly')");
+      a.exec("DROP TABLE deposit; DROP TABLE balance; PRAGMA user_version = 1;");
+      a.close();
+      const b = openDb(path);
+      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 2 });
+      expect(b.prepare("SELECT COUNT(*) AS n FROM deposit").get()).toEqual(expect.objectContaining({ n: 0 }));
+      expect(b.prepare("SELECT COUNT(*) AS n FROM balance").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT name FROM item").all()).toEqual([expect.objectContaining({ name: "월세" })]);
       b.close();
     } finally {

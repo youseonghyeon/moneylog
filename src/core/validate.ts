@@ -1,6 +1,6 @@
 // API 입력 검사. 실패 문구는 화면에 그대로 보이므로 "무엇이 잘못됐고 어떻게 고치나" 를 담는다.
-import { isLabel } from "./period.ts";
-import type { ItemInput } from "./types.ts";
+import { isDate, isLabel } from "./period.ts";
+import type { DepositInput, BalanceInput, ItemInput } from "./types.ts";
 
 export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -55,4 +55,29 @@ export function checkItem(body: unknown): Checked<ItemInput> {
       memo,
     },
   };
+}
+
+const memoOf = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 200) : "");
+
+export function checkDeposit(body: unknown): Checked<DepositInput> {
+  if (typeof body !== "object" || body === null) return fail("요청 본문이 JSON 객체가 아닙니다.");
+  const b = body as Record<string, unknown>;
+  if (!isInt(b.accountId, 1, Number.MAX_SAFE_INTEGER)) return fail("계좌를 골라 주세요.");
+  if (!isLabel(b.period)) return fail("기간은 YYYY-MM 형식이어야 합니다.");
+  if (!isDate(b.date)) return fail("넣은 날을 골라 주세요 (YYYY-MM-DD).");
+  const amount = checkAmount(b.amount);
+  if (!amount.ok) return amount;
+  if (amount.value === 0) return fail("넣은 금액을 넣어 주세요 (0원은 받지 않습니다).");
+  return { ok: true, value: { accountId: b.accountId, period: b.period, date: b.date, amount: amount.value, memo: memoOf(b.memo) } };
+}
+
+export function checkBalance(body: unknown): Checked<BalanceInput> {
+  if (typeof body !== "object" || body === null) return fail("요청 본문이 JSON 객체가 아닙니다.");
+  const b = body as Record<string, unknown>;
+  if (b.kind !== "stock" && b.kind !== "saving" && b.kind !== "loan") return fail("종류는 주식·적금·대출 중에서 골라 주세요.");
+  const name = checkName(b.name);
+  if (!name.ok) return name;
+  const amount = checkAmount(b.amount);
+  if (!amount.ok) return amount;
+  return { ok: true, value: { kind: b.kind, name: name.value, amount: amount.value, memo: memoOf(b.memo) } };
 }

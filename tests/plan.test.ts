@@ -36,4 +36,14 @@ describe("buildPlan", () => {
     const p = buildPlan("2026-10", 1, [...accounts, { id: 3, name: "비상금", memo: "", sort: 2 }], items, []);
     expect(p.accounts[2]).toMatchObject({ total: 0, lines: [] });
   });
+  it("입금은 그 기간·그 계좌에만, 넣은 날 순", () => {
+    const d = (id: number, accountId: number, period: string, date: string, amount: number) =>
+      ({ id, accountId, period, date, amount, memo: "" });
+    const ds = [d(1, 1, "2026-10", "2026-10-26", 100_000), d(2, 1, "2026-10", "2026-10-25", 800_000), d(3, 2, "2026-10", "2026-10-25", 400_000), d(4, 1, "2026-11", "2026-11-25", 1)];
+    const p = buildPlan("2026-10", 25, accounts, items, [], ds);
+    expect(p.accounts[0]!.deposits.map((x) => x.id)).toEqual([2, 1]);
+    expect(p.accounts.map((a) => a.deposited)).toEqual([900_000, 400_000]);
+    expect(p.deposited).toBe(1_300_000);
+    expect(buildPlan("2026-10", 25, accounts, items, []).deposited).toBe(0);
+  });
 });

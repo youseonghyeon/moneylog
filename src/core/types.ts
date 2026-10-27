@@ -42,6 +42,35 @@ export interface Override {
   amount: number;
 }
 
+/** 계좌에 넣은 돈. 넣은 기간에 묶인다 (월급이 주말이라 하루 일찍 들어와도 그 기간으로 센다) */
+export interface Deposit {
+  id: number;
+  accountId: number;
+  /** 기간 이름 (YYYY-MM) */
+  period: string;
+  /** 넣은 날 (YYYY-MM-DD) */
+  date: string;
+  amount: number;
+  memo: string;
+}
+
+export type DepositInput = Omit<Deposit, "id">;
+
+export type BalanceKind = "stock" | "saving" | "loan";
+
+/** 주식·적금·대출 잔액. 추적 없이 지금 얼마인지만 (대출은 남은 원금) */
+export interface Balance {
+  id: number;
+  kind: BalanceKind;
+  name: string;
+  amount: number;
+  memo: string;
+  /** 금액을 마지막으로 바꾼 날 (YYYY-MM-DD) */
+  updatedAt: string;
+}
+
+export type BalanceInput = Pick<Balance, "kind" | "name" | "amount" | "memo">;
+
 export interface Settings {
   /** 기간 시작일(1~28). 1 이면 달력 월, 25 면 25일 ~ 다음 달 24일 (월급일 기준) */
   startDay: number;
@@ -68,11 +97,16 @@ export interface PlanLine {
 export interface AccountPlan {
   account: Account;
   lines: PlanLine[];
+  /** 나갈 돈 합계 */
   total: number;
+  deposits: Deposit[];
+  /** 넣은 돈 합계 */
+  deposited: number;
 }
 
 export interface Plan {
   period: Period;
   accounts: AccountPlan[];
   total: number;
+  deposited: number;
 }
