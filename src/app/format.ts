@@ -1,4 +1,4 @@
-import type { BalanceKind, Item } from "../core/types.ts";
+import type { BalanceKind } from "../core/types.ts";
 
 export const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
@@ -32,12 +32,4 @@ export const labelText = (label: string) => `${label.slice(0, 4)}년 ${Number(la
 export function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** 항목이 언제 나가는지 한 줄 (이번 기간에 안 나가는 항목 목록용) */
-export function scheduleText(it: Item): string {
-  const day = it.day ? `${it.day}일` : "날짜 미정";
-  const when = it.cycle === "yearly" ? `매년 ${it.month}월 ${day}` : `매월 ${day}`;
-  const range = [it.startMonth && `${it.startMonth}부터`, it.endMonth && `${it.endMonth}까지`].filter(Boolean).join(" ");
-  return range ? `${when} · ${range}` : when;
 }

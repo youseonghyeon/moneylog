@@ -90,7 +90,7 @@ try {
   // 휴대폰: 처음엔 요약만, 줄을 누르면 그 줄 아래로 펼쳐진다 (한 번에 하나)
   const pick = (name) => page.locator(".pick", { hasText: name });
   check((await total()) === "931,230원", "입금 필요 금액 931,230원 (생활비 항목 600,000 은 뺀다)");
-  check((await page.locator(".pick").count()) === 3, "요약 줄 = 빠져나갈 돈 있는 계좌 2 + 안 나가는 항목 (생활비 계좌는 없음)");
+  check((await page.locator(".pick").count()) === 2, "요약 줄 = 빠져나갈 돈 있는 계좌 2 (생활비 계좌는 없음)");
   check((await page.locator("section.acct").count()) === 0, "휴대폰은 처음엔 다 접혀 있다");
   check((await pick("대출·고지서").locator("b").innerText()) === "381,230원", "계좌 줄에 그 계좌 입금 필요 금액");
   await pick("대출·고지서").click();
@@ -114,9 +114,8 @@ try {
     goneSeen += await acct(n).locator("em", { hasText: "나감" }).count();
   }
   check(goneSeen === gone.length, `지난 확정 항목은 '나감' (${gone.length}건)`);
-  await pick("안 나가는 항목").click();
-  check((await page.locator('section.acct[aria-label="이번 기간에 안 나가는 항목"] .line').count()) === 1, "다른 달 매년 항목은 '안 나가는 항목' (생활비 항목은 여기도 없음)");
-  await pick("안 나가는 항목").click();
+  check((await page.getByText("안 나가는 항목").count()) === 0, "'이번 기간에 안 나가는 항목' 목록 없음");
+  await pick("고정 지출").click();
   await page.screenshot({ path: `${OUT}/01-plan-mobile.png`, fullPage: true });
   // 보기 전용: 입력 수단이 없다
   // 요약 줄·분류·정렬·달력 칸은 볼 것을 고르는 버튼이라 뺀다

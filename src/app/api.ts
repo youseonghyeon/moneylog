@@ -1,5 +1,5 @@
 // /api 호출. 실패하면 서버가 준 문구로 Error 를 던진다 (화면이 그대로 보여 줌).
-import type { Balance, Item, Plan, Settings, Spend } from "../core/types.ts";
+import type { Balance, Plan, Settings, Spend } from "../core/types.ts";
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
@@ -21,7 +21,6 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 // 화면은 보기 전용 — 쓰기 API 는 에이전트가 직접 부른다
 export const api = {
   plan: (period: string) => req<Plan>("GET", `/api/plan?period=${period}`),
-  items: () => req<Item[]>("GET", "/api/items"),
   balances: () => req<Balance[]>("GET", "/api/balances"),
   spends: (period: string) => req<Spend[]>("GET", `/api/spends?period=${period}`),
   budget: (period: string) => req<{ period: string; amount: number | null }>("GET", `/api/budget/${period}`),

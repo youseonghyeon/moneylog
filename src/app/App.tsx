@@ -4,9 +4,9 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { labelOf, shiftLabel } from "../core/period.ts";
-import type { Balance, Item, Plan, PlanLine, Settings, Spend } from "../core/types.ts";
+import type { Balance, Plan, PlanLine, Settings, Spend } from "../core/types.ts";
 import { api } from "./api.ts";
-import { dateText, KIND_NAMES, labelText, scheduleText, shortDate, todayStr, won } from "./format.ts";
+import { dateText, KIND_NAMES, labelText, shortDate, todayStr, won } from "./format.ts";
 import { SpendView } from "./SpendView.tsx";
 import { useWide } from "./useWide.ts";
 
@@ -21,7 +21,6 @@ const tabOf = (): Tab => (location.hash === "#spend" ? "spend" : location.hash =
 export function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [spends, setSpends] = useState<Spend[]>([]);
   const [budget, setBudget] = useState<number | null>(null);
@@ -32,10 +31,9 @@ export function App() {
     try {
       const s = await api.settings();
       const l = label ?? labelOf(todayStr(), s.startDay);
-      const [p, its, bs, sp, bu] = await Promise.all([api.plan(l), api.items(), api.balances(), api.spends(l), api.budget(l)]);
+      const [p, bs, sp, bu] = await Promise.all([api.plan(l), api.balances(), api.spends(l), api.budget(l)]);
       setSettings(s);
       setPlan(p);
-      setItems(its);
       setBalances(bs);
       setSpends(sp);
       setBudget(bu.amount);
@@ -93,7 +91,7 @@ export function App() {
         </p>
       )}
 
-      {tab === "plan" && <PlanView plan={plan} items={items} />}
+      {tab === "plan" && <PlanView plan={plan} />}
       {tab === "spend" && <SpendView spends={spends} period={plan.period} budget={budget} />}
       {tab === "balance" && <BalanceView balances={balances} />}
     </div>
@@ -101,8 +99,8 @@ export function App() {
 }
 
 /** 요약의 줄 하나 = 버튼. 누르면 그 내용을 연다 (PC: 오른쪽, 휴대폰: 줄 바로 아래) */
-type Pick = number | "balances" | "idle";
-function PlanView({ plan, items }: { plan: Plan; items: Item[] }) {
+type Pick = number;
+function PlanView({ plan }: { plan: Plan }) {
   const today = todayStr();
   const wide = useWide();
   // 예정 탭은 날짜가 정해져 빠져나가는 돈만 — 생활비 예상 항목은 뺀다
@@ -115,17 +113,13 @@ function PlanView({ plan, items }: { plan: Plan; items: Item[] }) {
   const lines = accounts.flatMap((a) => a.lines);
   const total = lines.reduce((s, l) => s + l.amount, 0);
   const estimated = lines.filter((l) => l.estimated).length;
-  const due = new Set(plan.accounts.flatMap((a) => a.lines.map((l) => l.item.id)));
-  const idle = items.filter((it) => !due.has(it.id) && !it.living);
-  const accountName = new Map(plan.accounts.map((a) => [a.account.id, a.account.name]));
   // PC 는 늘 하나가 열려 있고(처음엔 첫 계좌), 휴대폰은 처음엔 다 접혀 있다
   const [picked, setPicked] = useState<Pick | null>(null);
-  const first: Pick = accounts[0]?.account.id ?? "idle";
+  const first: Pick | null = accounts[0]?.account.id ?? null;
   const open: Pick | null = wide ? (picked ?? first) : picked;
   const toggle = (k: Pick) => setPicked(!wide && open === k ? null : k);
 
   const detail = (k: Pick) => {
-    if (k === "idle") return <IdleDetail idle={idle} accountName={accountName} />;
     const a = accounts.find((x) => x.account.id === k);
     return a ? <Schedule name={a.account.name} lines={a.lines} total={a.total} today={today} /> : null;
   };
@@ -148,7 +142,6 @@ function PlanView({ plan, items }: { plan: Plan; items: Item[] }) {
         <h3>계좌별</h3>
         <ul class="transfer">
           {accounts.map((a) => row(a.account.id, <span>{a.account.name}</span>, <b>{won(a.total)}</b>))}
-          {idle.length > 0 && row("idle", <span>이번 기간에 안 나가는 항목</span>, <small>{idle.length}개</small>)}
         </ul>
       </aside>
 
@@ -185,29 +178,6 @@ function Schedule({ name, lines, total, today }: { name: string; lines: PlanLine
             </li>
           );
         })}
-      </ul>
-    </section>
-  );
-}
-
-function IdleDetail({ idle, accountName }: { idle: Item[]; accountName: Map<number, string> }) {
-  return (
-    <section class="acct" aria-label="이번 기간에 안 나가는 항목">
-      <header>
-        <h2>이번 기간에 안 나가는 항목</h2>
-      </header>
-      <ul class="lines">
-        {idle.map((it) => (
-          <li class="line">
-            <span class="name">
-              {it.name}
-              <small>
-                {accountName.get(it.accountId)} · {scheduleText(it)}
-              </small>
-            </span>
-            <span class="amt">{won(it.amount)}</span>
-          </li>
-        ))}
       </ul>
     </section>
   );
