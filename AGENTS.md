@@ -1,0 +1,64 @@
+# moneylog — 에이전트 작업 지침
+
+개인 가계부. 사용자 혼자 쓴다(계정·권한 없음). 휴대폰·웹 모두에서 본다.
+
+## 목적 — 누구의 어떤 결정을 바꾸나 (2026-10-27)
+- 사용자는 월급을 받으면 돈을 용도별 계좌(예: 생활비 · 대출 이자·고지서 · 고정 지출)로 나눠 둔다.
+- 이 앱이 답할 질문: **"이번 기간에 각 계좌에 얼마를 넣어 둬야 하나"**. 첫 화면 맨 위가 이 답이다.
+- 알림 기능은 넣지 않는다(사용자 결정).
+
+## 지금 상태 (2026-10-27, 1단계)
+- 됨: 계좌 관리, 반복 항목(매월·매년, 날짜, 시작·종료 달, 변동 여부), 변동 항목의 기간별 실제 금액, 기간 시작일(월급일 기준), 계좌별·전체 합계, 이번 기간에 안 나가는 항목 목록.
+- 다음: 신한은행 거래내역 엑셀 가져오기(2단계 — **사용자가 보낸 실제 파일 양식으로** 파서를 만든다. 추측한 양식으로 만들지 않는다). 토스는 수기 입력(사용자 결정).
+- 은행 API: 금융결제원 오픈뱅킹·마이데이터는 기관 전용이라 쓰지 않는다. CODEF 는 개인 개발자 조건을 확인하지 못해 보류.
+
+## 언어·스택 (결정 2026-10-27)
+- TypeScript(strict) 하나로. 화면: Vite + Preact. 서버: Node 24 + Hono. DB: SQLite(`node:sqlite`, 내장).
+- 서버 TS 는 Node 24 의 타입 제거로 바로 실행한다(빌드 단계 없음) → **지울 수 있는 문법만**(`erasableSyntaxOnly`: enum·namespace·생성자 매개변수 속성 금지), 상대 import 에 `.ts` 확장자.
+- SQLite 를 고른 이유: 혼자 쓰고 데이터가 작다, 운영할 DB 서버가 없다, 백업이 파일 복사. 대가: Pod 1개 고정(배포 때 몇 초 끊김), DB 클라이언트로 바로 못 붙음. MySQL 은 사용자가 검토 후 SQLite 로 정했다 — DB 접근은 `src/server/db.ts` 한 곳에만 두어 바꿀 수 있게 유지한다.
+- `dependencies` 는 서버 런타임(hono·@hono/node-server)만. 화면 라이브러리·폰트(preact·pretendard)는 번들에 들어가므로 `devDependencies` — 런타임 이미지는 `npm ci --omit=dev`.
+- 폰트는 CDN 이 아니라 번들(pretendard 패키지)로 서빙한다 — 사설망 앱이고, CDN 이 느리면 스모크 테스트의 스크린샷이 폰트를 기다리다 멈췄다.
+
+## 구조
+- `src/core/` DOM·DB 없는 순수 TS. 서버와 화면이 같이 쓴다. 테스트로 고정한다.
+  - `types.ts` 도메인 타입(금액은 원 단위 정수) · `period.ts` 기간(이름 = 시작하는 달 YYYY-MM, 시작일 1~28)·항목이 나가는 날 · `plan.ts` 계좌별 합계 · `validate.ts` 입력 검사(실패 문구는 화면에 그대로 나간다 — 무엇을 어떻게 고치나)
+- `src/server/` `db.ts` 스키마·마이그레이션(`PRAGMA user_version`, 끝에만 붙인다)·쿼리 · `app.ts` `/api` 라우트(오류는 `{ error }`) · `main.ts` 진입점(+ `/healthz`, 정적 서빙, 캐시 헤더, SIGTERM)
+- `src/app/` Preact 화면. `App.tsx` 한 화면, `ItemSheet.tsx`·`SettingsSheet.tsx` 시트(모바일은 아래에서, 640px 이상은 가운데), `api.ts` 호출
+- `tests/` vitest — 기간 경계(말일·2월·연말·시작일 1~28 × 날짜 1~31 전수), 계획 합계, API(실제 HTTP 요청 모양, 메모리 DB)
+- `scripts/ui-check.mjs` 운영과 같은 서버를 빈 임시 DB·포트 5299 로 띄워 Playwright 로 흐름 확인, `.shots/` 에 스크린샷
+
+## 도메인 규칙
+- 기간 이름은 시작하는 달. 시작일 25 면 `2026-10` = 10.25 ~ 11.24. 화면에 날짜 범위를 늘 같이 보여 준다.
+- 매월 항목은 기간마다 정확히 한 번(시작일보다 앞선 날짜는 다음 달 날짜). 31일 같은 날은 짧은 달에 말일로. 날짜 미정은 기간 시작일.
+- 시작·종료 달은 **실제로 나가는 날의 달** 기준, 양끝 포함.
+- 실제 금액(override)은 그 기간에만. 변동 항목이 실제 금액이 없으면 "예상". 변동을 끄면 그 기간 실제 금액을 지운다.
+- 항목이 있는 계좌는 지우지 않는다(409).
+
+## 디자인
+- 토큰은 `../net-sim/DESIGN.md` 와 같다(무채색 크롬, 액센트는 주요 버튼·선택에만, 경고색은 "예상"에만). 라이트·다크 둘 다.
+- 모바일 먼저: 입력칸 글자 16px(iOS 확대 방지), safe-area, 가로 스크롤 없음. 860px 이상은 요약을 왼쪽에 붙인 2단.
+- 숫자는 `tabular-nums`. 이모지·대문자 라벨·장식 그라데이션 금지.
+
+## 사용자와 일하는 방식
+- 한국어 존댓말 어미, 짧고 직설적으로.
+- 큰 화면 변경·새 기능은 방향을 먼저 보여 주고 확인받는다.
+- 커밋은 아래 검증 통과 후, 경로를 지정해 stage(`git add -A` 금지). 원격 생성·push·클러스터 쓰기(`kubectl apply`)는 사용자 몫 또는 사용자 승인 후.
+
+## 배포 (kube-sim·net-sim 과 같은 흐름, 차이는 서버·PVC·노출 범위)
+- `Dockerfile`: 화면 번들 → `node:24-alpine` 에서 `node src/server/main.ts`(비특권 node uid 1000, 8080). `DB_PATH=/data/moneylog.db`.
+- `.github/workflows/docker-image.yml`: main push → typecheck + test 게이트 → `ghcr.io/youseonghyeon/moneylog`(`<sha>`, `latest`) → `deploy/values.yaml` 의 `image.tag` 봇 커밋. push 전에 `git pull --rebase`.
+- `deploy/`: Helm 차트. Deployment(`replicas: 1`, `Recreate` — SQLite + RWO), PVC(`moneylog-data`, 기본 StorageClass, ArgoCD·helm 이 지우지 않게 주석), Service, Ingress(tailscale, **funnel 없음 — tailnet 전용, WAN 노출 금지**: 로그인 기능이 없다).
+- `argocd/application.yaml`: namespace `app`, automated prune/selfHeal.
+- 차트를 고치면 `helm lint deploy && helm template moneylog deploy` 로 확인.
+
+## 검증
+```
+npm run typecheck   # tsc --noEmit
+npm test            # vitest (core + API)
+npm run ui-check    # 브라우저 스모크 (.shots/ 스크린샷)
+```
+코어·API 변경은 `npm test`, 화면 변경은 `npm run ui-check` 까지 통과하고 스크린샷을 직접 본다. Dockerfile 을 바꾸면 `docker build` 후 컨테이너를 띄워 `/healthz`·화면·DB 쓰기를 확인한다.
+
+## 알려진 한계
+- 백업 없음: local-path PVC 는 노드 디스크에 묶여 디스크가 죽으면 데이터를 잃는다. 백업 CronJob 또는 내보내기 기능이 다음 후보.
+- 홈 화면 아이콘(PWA 매니페스트·PNG 아이콘) 없음.

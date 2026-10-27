@@ -1,0 +1,12 @@
+node_modules
+dist
+.shots
+.data
+*.db
+.git
+docs
+tests
+scripts
+argocd
+deploy
+*.md

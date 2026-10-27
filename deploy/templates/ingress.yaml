@@ -1,0 +1,15 @@
+# tailnet 전용. tailscale.com/funnel 주석을 붙이지 않는다 (공인 인터넷 노출 금지 — 로그인 기능이 없다)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: moneylog
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: moneylog
+      port:
+        number: {{ .Values.service.port }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hostname }}

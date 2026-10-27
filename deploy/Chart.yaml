@@ -1,0 +1,6 @@
+apiVersion: v2
+name: moneylog
+description: 개인 가계부 — 이번 기간 계좌별로 넣어 둘 금액 (Node + SQLite)
+type: application
+version: 0.1.0
+appVersion: "main"

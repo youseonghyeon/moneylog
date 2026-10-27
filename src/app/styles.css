@@ -1,0 +1,475 @@
+/* 토큰은 net-sim DESIGN.md 와 같다. 크롬은 무채색, 색은 액센트(주요 버튼·선택)·경고·오류에만. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --line: #dfe3e8;
+  --ink: #17191e;
+  --ink-2: #646b78;
+  --accent: #3457d5;
+  --warn: #c98a10;
+  --error: #d64541;
+  --radius: 12px;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171c;
+    --surface: #1e2128;
+    --surface-2: #262a32;
+    --line: #30353e;
+    --ink: #e8eaee;
+    --ink-2: #9aa1ad;
+    --accent: #7a93ff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 "Pretendard Variable", Pretendard, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+body.locked {
+  overflow: hidden;
+}
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+}
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+.amt,
+.total,
+.sum,
+.transfer b,
+.date,
+.money input {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 버튼 */
+button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button.danger {
+  color: var(--error);
+}
+button.icon {
+  border: 0;
+  background: none;
+  padding: 6px 10px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink-2);
+}
+button.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  align-self: flex-start;
+}
+
+/* 윗줄: ‹ 기간 › 설정 */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.period {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.period h1 {
+  font-size: 18px;
+}
+.period span {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.top .settings {
+  margin-left: auto;
+  font-size: 14px;
+}
+
+.layout {
+  display: grid;
+  gap: 16px;
+  padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+/* 요약: 총액 + 계좌별 넣어 둘 금액 */
+.summary {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.caption {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.total {
+  margin: 2px 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.summary .hint {
+  margin: 6px 0 0;
+  color: var(--warn);
+}
+.summary h3 {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.transfer {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.transfer li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.transfer li:first-child {
+  border-top: 0;
+}
+.transfer small {
+  margin-left: 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.transfer b {
+  font-weight: 600;
+}
+
+/* 계좌별 항목 */
+.detail {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+.acct,
+.idle {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 6px 0;
+}
+.acct > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 16px 4px;
+}
+.acct h2 {
+  font-size: 15px;
+}
+.sum {
+  font-weight: 600;
+}
+.lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 11px 16px;
+  text-align: left;
+}
+.line:hover {
+  background: var(--surface-2);
+}
+.line.past {
+  color: var(--ink-2);
+}
+.date {
+  width: 40px;
+  flex: none;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.name em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  vertical-align: 1px;
+}
+.name em.muted {
+  color: var(--ink-2);
+  background: var(--surface-2);
+}
+.name small {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.amt {
+  flex: none;
+}
+.empty {
+  margin: 0;
+  padding: 8px 16px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+.add {
+  display: block;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  padding: 10px 16px;
+  font-size: 14px;
+}
+.idle summary {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+/* 넓은 화면: 요약을 왼쪽에 붙여 둔다 */
+@media (min-width: 860px) {
+  .layout {
+    grid-template-columns: 340px 1fr;
+    align-items: start;
+    padding-top: 24px;
+  }
+  .summary {
+    position: sticky;
+    /* 윗줄(약 49px) + 위 여백(24px)보다 작아야 처음부터 내려앉지 않는다 */
+    top: 64px;
+  }
+}
+
+/* 시트: 모바일은 아래에서, 넓은 화면은 가운데 */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgb(0 0 0 / 0.35);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sheet {
+  width: 100%;
+  max-height: 92dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  padding: 4px 16px calc(16px + env(safe-area-inset-bottom));
+}
+@media (min-width: 640px) {
+  .backdrop {
+    align-items: center;
+  }
+  .sheet {
+    width: 480px;
+    border-radius: 16px;
+    padding-bottom: 16px;
+  }
+}
+.sheet-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  background: var(--surface);
+}
+.sheet-head h2 {
+  font-size: 17px;
+}
+
+/* 폼 */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.field > span {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.field.narrow {
+  flex: 0 0 96px;
+}
+.field input,
+.field select,
+.account-edit input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  /* iOS 는 16px 미만 입력칸에 포커스하면 화면을 확대한다 */
+  font-size: 16px;
+}
+.money {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.money input {
+  text-align: right;
+}
+.money > span {
+  color: var(--ink-2);
+}
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.align-end {
+  align-self: flex-end;
+  padding: 10px 16px;
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.seg {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 2px;
+}
+.seg button {
+  flex: 1;
+  border: 0;
+  background: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--ink-2);
+}
+.seg button.on {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 4px;
+}
+.grow {
+  flex: 1;
+}
+.group h3 {
+  font-size: 14px;
+}
+.hint {
+  margin: 4px 0 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.account-edit {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.account-edit li {
+  display: flex;
+  gap: 8px;
+}
+.account-edit li input:first-child {
+  flex: 3;
+}
+.account-edit li input:nth-child(2) {
+  flex: 2;
+}
+.error {
+  margin: 0;
+  color: var(--error);
+  font-size: 14px;
+}
+.banner {
+  max-width: 1040px;
+  margin: 12px auto 0;
+  padding: 0 16px;
+}
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 60dvh;
+  padding: 16px;
+}

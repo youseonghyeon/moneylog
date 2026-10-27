@@ -1,0 +1,29 @@
+{
+  "name": "moneylog",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "node --watch src/server/main.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "node src/server/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "ui-check": "node scripts/ui-check.mjs"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^24.19.2",
+    "playwright": "^1.63.0",
+    "preact": "^10.29.8",
+    "pretendard": "^1.3.9",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "hono": "^4.13.14"
+  }
+}
