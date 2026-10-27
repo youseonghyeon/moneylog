@@ -101,7 +101,8 @@ try {
   );
   check((await bal.locator(".kind").nth(1).locator("small").innerText()).includes("2027-06 만기 ·"), "잔액 메모·기준일");
   // 보기 전용: 입력 수단이 없다
-  const inputs = await page.locator("main button, main input, main select, main textarea, [aria-label='설정']").count();
+  // 지출 달력 칸은 보는 날을 고르는 버튼이라 뺀다
+  const inputs = await page.locator("main button:not(.cal-cell), main input, main select, main textarea, [aria-label='설정']").count();
   check(inputs === 0, `입력 버튼·입력칸 없음 (${inputs})`);
   check((await page.getByText(/항목 추가|\+ 입금|추가$/).count()) === 0, "'추가'·'입금' 버튼 문구 없음");
   await page.screenshot({ path: `${OUT}/01-plan-mobile.png`, fullPage: true });
@@ -122,11 +123,19 @@ try {
     (await page.locator(".cats .cat").allInnerTexts()).join(",") === "쇼핑,식비,카페·간식",
     "분류는 큰 것부터 (쇼핑 30,000 · 식비 9,600 · 카페 3,300)",
   );
-  const days = page.locator(".days details");
-  check((await days.count()) === (today === first ? 1 : 2), "날짜별 묶음");
-  await days.first().locator("summary").click();
-  const firstDay = await days.first().locator(".line.sub .name").allInnerTexts();
-  check(firstDay[0].startsWith("왓더버거"), "그날 거래는 늦은 시각부터");
+  const cells = page.locator(".cal-cell:not(.out)");
+  const monthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  check((await cells.count()) === monthDays, `달력은 기간 날 수만큼 (${monthDays}칸)`);
+  check((await page.locator(".cal-cell.on.today").count()) === 1, "처음엔 오늘이 골라져 있다");
+  const picked = page.locator('section[aria-label="고른 날"]');
+  check((await picked.locator(".line .name").first().innerText()).startsWith("왓더버거"), "고른 날 거래는 늦은 시각부터");
+  if (today !== first) {
+    check((await page.locator(".cal-cell.today .cal-amt").innerText()) === "12,900", "오늘 칸에 그날 합계");
+    await cells.first().click();
+    check((await picked.locator(".sum").innerText()) === "30,000원", "1일 칸을 누르면 그날 합계 30,000원 (환불 반영)");
+    check((await picked.locator(".amt.refund").count()) === 1, "환불은 흐리게");
+    await page.locator(".cal-cell.today").click();
+  }
   await page.screenshot({ path: `${OUT}/02-spend-mobile.png`, fullPage: true });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector(".cats");

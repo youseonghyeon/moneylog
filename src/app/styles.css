@@ -344,27 +344,68 @@ button.icon {
   font-weight: 600;
   text-align: right;
 }
-/* 지출: 날짜별 (누르면 그날 거래) */
-.days details + details {
-  border-top: 1px solid var(--line);
+/* 지출: 달력 (날마다 합계, 많이 쓴 날일수록 진하게) */
+.cal {
+  padding: 10px;
 }
-.days summary {
-  list-style: none;
-  cursor: pointer;
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
 }
-.days summary::-webkit-details-marker {
-  display: none;
-}
-.days .count {
-  color: var(--ink-2);
+.cal-head {
+  text-align: center;
   font-size: 12px;
+  color: var(--ink-2);
+  padding: 2px 0 4px;
 }
-.days details[open] summary {
-  font-weight: 600;
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-height: 52px;
+  min-width: 0;
+  padding: 4px 3px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
-.line.sub {
-  padding-left: 28px;
-  font-size: 14px;
+.cal-cell.out {
+  visibility: hidden;
+}
+.cal-cell.future {
+  opacity: 0.4;
+}
+.cal-cell.today .cal-day {
+  color: var(--accent);
+  font-weight: 700;
+}
+.cal-cell.on {
+  border-color: var(--accent);
+}
+.cal-day {
+  font-size: 12px;
+  color: var(--ink-2);
+  text-align: left;
+}
+.cal-amt {
+  font-size: 11px;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+@media (min-width: 860px) {
+  .cal-cell {
+    min-height: 64px;
+    padding: 6px;
+  }
+  .cal-amt {
+    font-size: 13px;
+  }
 }
 .note {
   margin: 0;

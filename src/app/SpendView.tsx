@@ -1,11 +1,36 @@
-// 지출 탭: 그 기간 생활비 거래 — 합계·하루 평균 · 분류별 막대 · 날짜별(누르면 그날 거래)
+// 지출 탭: 그 기간 생활비 거래 — 합계·하루 평균 · 분류별 막대 · 달력(날마다 합계, 누르면 그날 거래)
+import { useState } from "preact/hooks";
 import { summarizeSpends } from "../core/spend.ts";
 import type { Period, Spend } from "../core/types.ts";
-import { dayText, todayStr, won } from "./format.ts";
+import { addDays, dayText, todayStr, won } from "./format.ts";
+
+const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+const weekday = (d: string) => new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))).getUTCDay();
+
+/** 기간을 덮는 주(일~토) 목록. 기간 밖 칸은 null */
+function weeksOf(p: Period): (string | null)[][] {
+  const weeks: (string | null)[][] = [];
+  let d = addDays(p.start, -weekday(p.start));
+  while (d <= p.end) {
+    const w: (string | null)[] = [];
+    for (let i = 0; i < 7; i++, d = addDays(d, 1)) w.push(d >= p.start && d <= p.end ? d : null);
+    weeks.push(w);
+  }
+  return weeks;
+}
 
 export function SpendView({ spends, period }: { spends: Spend[]; period: Period }) {
-  const r = summarizeSpends(spends, period, todayStr());
+  const today = todayStr();
+  const r = summarizeSpends(spends, period, today);
+  const byDay = new Map(r.days.map((d) => [d.date, d]));
   const max = Math.max(1, ...r.byCategory.map((c) => c.total));
+  const dayMax = Math.max(1, ...r.days.map((d) => d.total));
+  // 처음엔 오늘(기간 안이면), 아니면 가장 최근에 쓴 날
+  const initial = today >= period.start && today <= period.end ? today : (r.days[0]?.date ?? period.start);
+  const [picked, setPicked] = useState<string | null>(null);
+  const sel = picked && picked >= period.start && picked <= period.end ? picked : initial;
+  const day = byDay.get(sel);
+
   return (
     <main class="layout">
       <aside class="summary">
@@ -36,34 +61,48 @@ export function SpendView({ spends, period }: { spends: Spend[]; period: Period 
       </aside>
 
       <div class="detail">
-        {r.days.length === 0 ? (
-          <section class="acct">
-            <p class="empty">이 기간에 기록된 생활비가 없습니다.</p>
-          </section>
-        ) : (
-          <section class="acct days" aria-label="날짜별">
-            {r.days.map((d) => (
-              <details>
-                <summary class="line">
-                  <span class="name">{dayText(d.date)}</span>
-                  <small class="count">{d.spends.length}건</small>
-                  <span class="amt">{won(d.total)}</span>
-                </summary>
-                <ul class="lines">
-                  {d.spends.map((s) => (
-                    <li class="line sub">
-                      <span class="name">
-                        {s.merchant}
-                        <small>{[s.time, s.category, s.source].filter(Boolean).join(" · ")}</small>
-                      </span>
-                      <span class={s.amount < 0 ? "amt refund" : "amt"}>{won(s.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
+        <section class="acct cal" aria-label="달력">
+          <div class="cal-grid" role="grid">
+            {WEEK.map((w) => (
+              <span class="cal-head">{w}</span>
             ))}
-          </section>
-        )}
+            {weeksOf(period).flat().map((d) => {
+              if (!d) return <span class="cal-cell out" />;
+              const t = byDay.get(d)?.total ?? 0;
+              const cls = ["cal-cell", d === sel && "on", d === today && "today", d > today && "future"].filter(Boolean).join(" ");
+              // 그날 쓴 돈이 많을수록 진하게 (기간 안 최대 대비)
+              const shade = t > 0 ? `color-mix(in srgb, var(--ink-2) ${Math.round(8 + (t / dayMax) * 32)}%, transparent)` : undefined;
+              return (
+                <button type="button" class={cls} style={shade && { background: shade }} aria-label={`${dayText(d)} ${won(t)}`} onClick={() => setPicked(d)}>
+                  <span class="cal-day">{d.slice(8) === "01" || d === period.start ? `${+d.slice(5, 7)}.${+d.slice(8)}` : +d.slice(8)}</span>
+                  {t !== 0 && <span class="cal-amt">{t.toLocaleString("ko-KR")}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section class="acct" aria-label="고른 날">
+          <header>
+            <h2>{dayText(sel)}</h2>
+            <span class="sum">{won(day?.total ?? 0)}</span>
+          </header>
+          {day ? (
+            <ul class="lines">
+              {day.spends.map((s) => (
+                <li class="line">
+                  <span class="name">
+                    {s.merchant}
+                    <small>{[s.time, s.category, s.source].filter(Boolean).join(" · ")}</small>
+                  </span>
+                  <span class={s.amount < 0 ? "amt refund" : "amt"}>{won(s.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="empty">이날은 쓴 돈이 없습니다.</p>
+          )}
+        </section>
       </div>
     </main>
   );

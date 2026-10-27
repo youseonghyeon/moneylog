@@ -5,6 +5,12 @@ export const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 /** 2026-10-25 → 10.25 */
 export const shortDate = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`;
 
+/** 2026-10-27 + n일 → YYYY-MM-DD */
+export function addDays(d: string, n: number): string {
+  const t = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10) + n));
+  return t.toISOString().slice(0, 10);
+}
+
 /** 2026-10-27 → 10.27 (화) */
 export const dayText = (d: string) =>
   `${shortDate(d)} (${"일월화수목금토"[new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))).getUTCDay()]})`;
