@@ -85,19 +85,34 @@ try {
   const total = () => page.locator(".total").innerText();
   const acct = (name) => page.locator(`section.acct[aria-label="${name}"]`);
 
-  // 예정 탭
-  check((await page.locator(".transfer li").count()) === 3, "기본 계좌 3개");
+  // 예정 탭 — 휴대폰: 처음엔 요약만, 줄을 누르면 그 줄 아래로 펼쳐진다 (한 번에 하나)
+  const pick = (name) => page.locator(".pick", { hasText: name });
+  check((await page.locator(".pick").count()) === 5, "요약 줄 = 계좌 3 + 주식·적금·대출 + 안 나가는 항목");
+  check((await page.locator("section.acct").count()) === 0, "휴대폰은 처음엔 다 접혀 있다");
   check((await total()) === "1,531,230원", "합계 1,531,230원 (전기 실제 금액 반영)");
   check((await page.locator(".summary .hint").innerText()).includes("예상 금액 1건"), "변동 항목 실제 금액 없으면 예상 1건");
-  check((await acct("생활비").locator("em", { hasText: "예상" }).count()) === 1, "식비에 '예상' 표시");
-  check((await acct("생활비").locator(".left").innerText()).includes("남음 200,000원"), "생활비 800,000 − 600,000 → 남음 200,000원");
-  check((await acct("대출·고지서").locator(".left .short").innerText()) === "부족 81,230원", "대출·고지서 300,000 − 381,230 → 부족 81,230원");
   check((await page.locator(".summary .put").last().innerText()).includes("넣은 돈 1,100,000원 · 부족 431,230원"), "요약: 넣은 돈·부족");
-  check((await page.locator(".idle summary").innerText()).includes("1개"), "다른 달 매년 항목은 '안 나가는 항목'");
+  check((await pick("대출·고지서").locator(".short").innerText()) === "부족 81,230원", "요약 줄에 계좌별 부족");
+  await pick("생활비").click();
+  check((await pick("생활비").getAttribute("aria-expanded")) === "true", "누른 줄은 열림 표시");
+  check((await page.locator(".summary .unfold section.acct").count()) === 1, "누른 줄 바로 아래로 펼쳐진다");
+  check((await acct("생활비").locator("em", { hasText: "예상" }).count()) === 1, "식비에 '예상' 표시");
+  check((await acct("생활비").locator("em", { hasText: "나감" }).count()) === 0, "예상 금액 항목은 날짜가 지나도 '나감' 아님");
+  check((await acct("생활비").locator(".left").innerText()).includes("남음 200,000원"), "생활비 800,000 − 600,000 → 남음 200,000원");
+  await page.screenshot({ path: `${OUT}/01-plan-mobile-open.png`, fullPage: true });
+  await pick("대출·고지서").click();
+  check((await page.locator("section.acct").count()) === 1 && (await acct("대출·고지서").count()) === 1, "다른 줄을 누르면 그것만 열린다");
+  check((await acct("대출·고지서").locator(".left .short").innerText()) === "부족 81,230원", "대출·고지서 300,000 − 381,230 → 부족 81,230원");
   // 날짜가 지났고 금액이 확정된 줄만 "나감" (대출 이자 5일 · 전기 20일(실제 금액) · 월세 25일). 식비는 예상이라 아님
   const gone = [[5, 320000], [20, 61230], [25, 550000]].filter(([d]) => d <= now.getDate());
-  check((await page.locator("em", { hasText: "나감" }).count()) === gone.length, `지난 확정 항목은 '나감' (${gone.length}건)`);
-  check((await acct("생활비").locator("em", { hasText: "나감" }).count()) === 0, "예상 금액 항목은 날짜가 지나도 '나감' 아님");
+  await pick("대출·고지서").click();
+  check((await page.locator("section.acct").count()) === 0, "열린 줄을 다시 누르면 접힌다");
+  let goneSeen = 0;
+  for (const n of ["생활비", "대출·고지서", "고정 지출"]) {
+    await pick(n).click();
+    goneSeen += await acct(n).locator("em", { hasText: "나감" }).count();
+  }
+  check(goneSeen === gone.length, `지난 확정 항목은 '나감' (${gone.length}건)`);
   if (gone.length) {
     const g = gone.reduce((s, [, a]) => s + a, 0);
     check(
@@ -105,15 +120,20 @@ try {
       "요약: 이미 나간 돈 · 앞으로",
     );
   }
+  await pick("안 나가는 항목").click();
+  check((await page.locator('section.acct[aria-label="이번 기간에 안 나가는 항목"] .line').count()) === 1, "다른 달 매년 항목은 '안 나가는 항목'");
+  await pick("주식·적금·대출").click();
   const bal = acct("주식·적금·대출");
   check(
     (await bal.locator(".kind h3").allInnerTexts()).join("|").replace(/\s+/g, " ") === "주식 3,200,000원|적금 1,500,000원|대출 120,000,000원",
     "잔액은 주식·적금·대출 순으로 묶인다",
   );
   check((await bal.locator(".kind").nth(1).locator("small").innerText()).includes("2027-06 만기 ·"), "잔액 메모·기준일");
+  await pick("주식·적금·대출").click();
+  await page.screenshot({ path: `${OUT}/01-plan-mobile.png`, fullPage: true });
   // 보기 전용: 입력 수단이 없다
-  // 지출 달력 칸은 보는 날을 고르는 버튼이라 뺀다
-  const inputs = await page.locator("main button:not(.cal-cell), main input, main select, main textarea, [aria-label='설정']").count();
+  // 요약 줄(.pick)·지출 달력 칸은 볼 것을 고르는 버튼이라 뺀다
+  const inputs = await page.locator("main button:not(.cal-cell):not(.pick), main input, main select, main textarea, [aria-label='설정']").count();
   check(inputs === 0, `입력 버튼·입력칸 없음 (${inputs})`);
   check((await page.getByText(/항목 추가|\+ 입금|추가$/).count()) === 0, "'추가'·'입금' 버튼 문구 없음");
   await page.screenshot({ path: `${OUT}/01-plan-mobile.png`, fullPage: true });
@@ -156,6 +176,16 @@ try {
 
   // 넓은 화면 · 다크
   await page.setViewportSize({ width: 1280, height: 860 });
+  // PC: 오른쪽에 하나만, 처음엔 첫 계좌. 줄을 누르면 바뀐다(접히지는 않는다)
+  await page.waitForSelector(".detail section.acct");
+  check((await page.locator(".detail section.acct").count()) === 1 && (await page.locator(".detail section.acct").getAttribute("aria-label")) === "생활비", "PC: 오른쪽에 첫 계좌 하나만");
+  check((await page.locator(".summary .unfold").count()) === 0, "PC: 요약 안에는 펼치지 않는다");
+  await pick("고정 지출").click();
+  await pick("고정 지출").click();
+  check((await page.locator(".detail section.acct").getAttribute("aria-label")) === "고정 지출", "PC: 누른 계좌로 바뀌고 다시 눌러도 닫히지 않는다");
+  const h = await page.evaluate(() => document.documentElement.scrollHeight);
+  check(h <= 860, `PC: 한 화면 안에 들어온다 (${h}px)`);
+  await pick("생활비").click();
   await page.screenshot({ path: `${OUT}/03-plan-desktop.png` });
   await page.getByRole("tab", { name: "지출" }).click();
   await page.screenshot({ path: `${OUT}/04-spend-desktop.png` });

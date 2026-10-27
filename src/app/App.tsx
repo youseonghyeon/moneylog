@@ -1,6 +1,7 @@
 // 한 화면, 탭 둘(예정 · 지출). 보기 전용 — 입력은 사용자 대신 에이전트가 API 로 넣는다(사용자 결정 2026-10-27).
-// 예정: 기간 이동 · 계좌별 넣어 둘 금액 · 계좌마다 입금·항목 · 이번 기간에 안 나가는 항목 · 주식·적금·대출 잔액
+// 예정: 기간 이동 · 계좌별 넣어 둘 금액(줄을 누르면 그 계좌 입금·항목 — PC 는 오른쪽, 휴대폰은 줄 아래) · 주식·적금·대출 · 안 나가는 항목
 // 지출: 그 기간 생활비 거래 — 분류별·날짜별
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { labelOf, shiftLabel } from "../core/period.ts";
 import type { Balance, Item, Plan, PlanLine, Settings, Spend } from "../core/types.ts";
@@ -93,16 +94,54 @@ export function App() {
   );
 }
 
+/** 요약의 줄 하나 = 버튼. 누르면 그 내용을 연다 (PC: 오른쪽, 휴대폰: 줄 바로 아래) */
+type Pick = number | "balances" | "idle";
+const WIDE = "(min-width: 860px)";
+
+function useWide(): boolean {
+  const [wide, setWide] = useState(() => matchMedia(WIDE).matches);
+  useEffect(() => {
+    const on = () => setWide(matchMedia(WIDE).matches);
+    window.addEventListener("resize", on);
+    // 그린 뒤 리스너를 붙이기 전에 화면 폭이 바뀌었을 수 있다 — 붙이자마자 한 번 다시 잰다
+    on();
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return wide;
+}
+
 function PlanView({ plan, items, balances }: { plan: Plan; items: Item[]; balances: Balance[] }) {
   const today = todayStr();
+  const wide = useWide();
   const lines = plan.accounts.flatMap((a) => a.lines);
   const estimated = lines.filter((l) => l.estimated).length;
   // 날짜가 지났고 금액이 확정된 줄 = 이미 나간 돈 (예상 금액은 아직 확정이 아니라 나갔다고 보지 않는다)
   const gone = (l: PlanLine) => l.due <= today && !l.estimated;
   const goneTotal = lines.filter(gone).reduce((s, l) => s + l.amount, 0);
-  const due = new Set(plan.accounts.flatMap((a) => a.lines.map((l) => l.item.id)));
+  const due = new Set(lines.map((l) => l.item.id));
   const idle = items.filter((it) => !due.has(it.id));
   const accountName = new Map(plan.accounts.map((a) => [a.account.id, a.account.name]));
+  // PC 는 늘 하나가 열려 있고(처음엔 첫 계좌), 휴대폰은 처음엔 다 접혀 있다
+  const [picked, setPicked] = useState<Pick | null>(null);
+  const first = plan.accounts[0]?.account.id ?? "balances";
+  const open: Pick | null = wide ? (picked ?? first) : picked;
+  const toggle = (k: Pick) => setPicked(!wide && open === k ? null : k);
+
+  const detail = (k: Pick) => {
+    if (k === "balances") return <BalancesDetail balances={balances} />;
+    if (k === "idle") return <IdleDetail idle={idle} accountName={accountName} />;
+    const a = plan.accounts.find((x) => x.account.id === k);
+    return a ? <AccountDetail a={a} today={today} gone={gone} /> : null;
+  };
+  const row = (k: Pick, label: ComponentChildren, right: ComponentChildren) => (
+    <li>
+      <button type="button" class={open === k ? "pick on" : "pick"} aria-expanded={open === k} onClick={() => toggle(k)}>
+        {label}
+        <span class="need">{right}</span>
+      </button>
+      {!wide && open === k && <div class="unfold">{detail(k)}</div>}
+    </li>
+  );
 
   return (
     <main class="layout">
@@ -122,128 +161,141 @@ function PlanView({ plan, items, balances }: { plan: Plan; items: Item[]; balanc
         )}
         <h3>계좌별로 넣어 둘 금액</h3>
         <ul class="transfer">
-          {plan.accounts.map((a) => (
-            <li>
+          {plan.accounts.map((a) =>
+            row(
+              a.account.id,
               <span>
                 {a.account.name}
                 {a.account.memo && <small>{a.account.memo}</small>}
-              </span>
-              <span class="need">
+              </span>,
+              <>
                 <b>{won(a.total)}</b>
                 {a.deposits.length > 0 && (
                   <small>
                     넣음 {won(a.deposited)} · <Left value={a.deposited - a.total} />
                   </small>
                 )}
-              </span>
-            </li>
-          ))}
+              </>,
+            ),
+          )}
+          {row("balances", <span>주식·적금·대출</span>, <small>{balances.length}건</small>)}
+          {idle.length > 0 && row("idle", <span>이번 기간에 안 나가는 항목</span>, <small>{idle.length}개</small>)}
         </ul>
       </aside>
 
-      <div class="detail">
-        {plan.accounts.map((a) => (
-          <section class="acct" aria-label={a.account.name}>
-            <header>
-              <h2>{a.account.name}</h2>
-              <span class="sum">{won(a.total)}</span>
-            </header>
-            {a.deposits.length > 0 && (
-              <ul class="lines deposits">
-                {a.deposits.map((d) => (
-                  <li class="line">
-                    <span class="date">{shortDate(d.date)}</span>
-                    <span class="name">
-                      입금
-                      {d.memo && <small>{d.memo}</small>}
-                    </span>
-                    <span class="amt">+{won(d.amount)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {a.lines.length === 0 ? (
-              <p class="empty">이번 기간에 나가는 항목이 없습니다.</p>
-            ) : (
-              <ul class="lines">
-                {a.lines.map((l) => (
-                  <li class={l.due < today ? "line past" : "line"}>
-                    <span class="date">{shortDate(l.due)}</span>
-                    <span class="name">
-                      {l.item.name}
-                      {l.estimated && <em>예상</em>}
-                      {gone(l) && <em class="muted">나감</em>}
-                      {l.item.cycle === "yearly" && <em class="muted">매년</em>}
-                    </span>
-                    <span class="amt">{won(l.amount)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {a.deposits.length > 0 && (
-              <p class="left">
-                <span>
-                  넣은 돈 {won(a.deposited)} − 나갈 돈 {won(a.total)}
-                </span>
-                <Left value={a.deposited - a.total} />
-              </p>
-            )}
-          </section>
-        ))}
-
-        {idle.length > 0 && (
-          <details class="idle">
-            <summary>이번 기간에 안 나가는 항목 {idle.length}개</summary>
-            <ul class="lines">
-              {idle.map((it) => (
-                <li class="line">
-                  <span class="name">
-                    {it.name}
-                    <small>
-                      {accountName.get(it.accountId)} · {scheduleText(it)}
-                    </small>
-                  </span>
-                  <span class="amt">{won(it.amount)}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-
-        <section class="acct" aria-label="주식·적금·대출">
-          <header>
-            <h2>주식·적금·대출</h2>
-          </header>
-          {balances.length === 0 ? (
-            <p class="empty">아직 적어 둔 잔액이 없습니다.</p>
-          ) : (
-            (["stock", "saving", "loan"] as const).map((k) => {
-              const bs = balances.filter((b) => b.kind === k);
-              if (bs.length === 0) return null;
-              return (
-                <div class="kind" aria-label={KIND_NAMES[k]}>
-                  <h3>
-                    <span>{KIND_NAMES[k]}</span>
-                    <span class="sum">{won(bs.reduce((s, b) => s + b.amount, 0))}</span>
-                  </h3>
-                  <ul class="lines">
-                    {bs.map((b) => (
-                      <li class="line">
-                        <span class="name">
-                          {b.name}
-                          <small>{[b.memo, `${dateText(b.updatedAt)} 기준`].filter(Boolean).join(" · ")}</small>
-                        </span>
-                        <span class="amt">{won(b.amount)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })
-          )}
-        </section>
-      </div>
+      {wide && open !== null && <div class="detail unfold">{detail(open)}</div>}
     </main>
+  );
+}
+
+function AccountDetail({ a, today, gone }: { a: Plan["accounts"][number]; today: string; gone: (l: PlanLine) => boolean }) {
+  return (
+    <section class="acct" aria-label={a.account.name}>
+      <header>
+        <h2>{a.account.name}</h2>
+        <span class="sum">{won(a.total)}</span>
+      </header>
+      {a.deposits.length > 0 && (
+        <ul class="lines deposits">
+          {a.deposits.map((d) => (
+            <li class="line">
+              <span class="date">{shortDate(d.date)}</span>
+              <span class="name">
+                입금
+                {d.memo && <small>{d.memo}</small>}
+              </span>
+              <span class="amt">+{won(d.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {a.lines.length === 0 ? (
+        <p class="empty">이번 기간에 나가는 항목이 없습니다.</p>
+      ) : (
+        <ul class="lines">
+          {a.lines.map((l) => (
+            <li class={l.due < today ? "line past" : "line"}>
+              <span class="date">{shortDate(l.due)}</span>
+              <span class="name">
+                {l.item.name}
+                {l.estimated && <em>예상</em>}
+                {gone(l) && <em class="muted">나감</em>}
+                {l.item.cycle === "yearly" && <em class="muted">매년</em>}
+              </span>
+              <span class="amt">{won(l.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {a.deposits.length > 0 && (
+        <p class="left">
+          <span>
+            넣은 돈 {won(a.deposited)} − 나갈 돈 {won(a.total)}
+          </span>
+          <Left value={a.deposited - a.total} />
+        </p>
+      )}
+    </section>
+  );
+}
+
+function IdleDetail({ idle, accountName }: { idle: Item[]; accountName: Map<number, string> }) {
+  return (
+    <section class="acct" aria-label="이번 기간에 안 나가는 항목">
+      <header>
+        <h2>이번 기간에 안 나가는 항목</h2>
+      </header>
+      <ul class="lines">
+        {idle.map((it) => (
+          <li class="line">
+            <span class="name">
+              {it.name}
+              <small>
+                {accountName.get(it.accountId)} · {scheduleText(it)}
+              </small>
+            </span>
+            <span class="amt">{won(it.amount)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function BalancesDetail({ balances }: { balances: Balance[] }) {
+  return (
+    <section class="acct" aria-label="주식·적금·대출">
+      <header>
+        <h2>주식·적금·대출</h2>
+      </header>
+      {balances.length === 0 ? (
+        <p class="empty">아직 적어 둔 잔액이 없습니다.</p>
+      ) : (
+        (["stock", "saving", "loan"] as const).map((k) => {
+          const bs = balances.filter((b) => b.kind === k);
+          if (bs.length === 0) return null;
+          return (
+            <div class="kind" aria-label={KIND_NAMES[k]}>
+              <h3>
+                <span>{KIND_NAMES[k]}</span>
+                <span class="sum">{won(bs.reduce((s, b) => s + b.amount, 0))}</span>
+              </h3>
+              <ul class="lines">
+                {bs.map((b) => (
+                  <li class="line">
+                    <span class="name">
+                      {b.name}
+                      <small>{[b.memo, `${dateText(b.updatedAt)} 기준`].filter(Boolean).join(" · ")}</small>
+                    </span>
+                    <span class="amt">{won(b.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })
+      )}
+    </section>
   );
 }
 

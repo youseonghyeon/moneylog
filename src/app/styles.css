@@ -135,12 +135,50 @@ button.icon {
   padding: 0;
 }
 .transfer li {
+  border-top: 1px solid var(--line);
+}
+/* 요약의 줄 = 버튼: 누르면 그 내용을 연다 (PC 는 오른쪽, 휴대폰은 줄 아래) */
+.pick {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
+  width: calc(100% + 16px);
+  margin: 2px -8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+}
+.pick:hover {
+  background: var(--surface-2);
+}
+.pick.on {
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.unfold {
+  animation: unfold 0.18s ease-out;
+}
+@keyframes unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .unfold {
+    animation: none;
+  }
+}
+/* 휴대폰: 요약 카드 안에서 줄 아래로 펼친 내용 */
+.summary .unfold {
+  margin: 4px -18px 10px;
+}
+.summary .unfold .acct {
+  border-radius: 0;
+  background: var(--surface-2);
 }
 .transfer li:first-child {
   border-top: 0;
@@ -225,6 +263,8 @@ button.icon {
   overflow-wrap: anywhere;
 }
 .name em {
+  /* 긴 이름 끝에서 "예상" 같은 표시가 두 줄로 쪼개지지 않게 */
+  white-space: nowrap;
   margin-left: 6px;
   font-style: normal;
   font-size: 11px;
