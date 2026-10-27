@@ -23,9 +23,6 @@ export const dayText = (d: string) =>
 export const dateText = (d: string) =>
   d.slice(0, 4) === todayStr().slice(0, 4) ? shortDate(d) : `${d.slice(0, 4)}.${shortDate(d)}`;
 
-/** 넣은 돈 − 나갈 돈 → "남음 …" / "부족 …" */
-export const leftText = (left: number) => (left < 0 ? `부족 ${won(-left)}` : `남음 ${won(left)}`);
-
 export const KIND_NAMES: Record<BalanceKind, string> = { stock: "주식", saving: "적금", loan: "대출" };
 
 /** 2026-10 → 2026년 10월 */

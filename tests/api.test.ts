@@ -53,6 +53,14 @@ describe("API", () => {
     expect((await call("GET", "/api/plan?period=2026-10")).json.total).toBe(0);
   });
 
+  it("생활비 예상 표시(living): 기본 false, 넣고 고칠 수 있다", async () => {
+    const c = await call("POST", "/api/items", rent);
+    expect(c.json.living).toBe(false);
+    const l = await call("POST", "/api/items", { ...rent, name: "생활비", living: true });
+    expect(l.json.living).toBe(true);
+    expect((await call("PUT", `/api/items/${l.json.id}`, { ...rent, name: "생활비", living: false })).json.living).toBe(false);
+  });
+
   it("잘못된 입력은 400 과 고치는 법", async () => {
     const cases: [unknown, RegExp][] = [
       [{ ...rent, amount: -1 }, /금액/],
@@ -240,10 +248,10 @@ describe("DB 파일", () => {
       const path = join(dir, "v1.db");
       const a = openDb(path);
       a.exec("INSERT INTO item (account_id, name, amount, cycle) VALUES (3, '월세', 550000, 'monthly')");
-      a.exec("DROP TABLE deposit; DROP TABLE balance; DROP TABLE spend; PRAGMA user_version = 1;");
+      a.exec("DROP TABLE deposit; DROP TABLE balance; DROP TABLE spend; ALTER TABLE item DROP COLUMN living; PRAGMA user_version = 1;");
       a.close();
       const b = openDb(path);
-      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 3 });
+      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 4 });
       expect(b.prepare("SELECT COUNT(*) AS n FROM spend").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT COUNT(*) AS n FROM deposit").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT COUNT(*) AS n FROM balance").get()).toEqual(expect.objectContaining({ n: 0 }));

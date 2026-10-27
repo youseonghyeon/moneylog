@@ -68,6 +68,9 @@ const MIGRATIONS = [
   );
   CREATE INDEX spend_date ON spend (date);
   `,
+  `
+  ALTER TABLE item ADD COLUMN living INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export function openDb(path: string): Db {
@@ -109,6 +112,7 @@ const toItem = (r: Row): Item => ({
   startMonth: r.start_month == null ? null : String(r.start_month),
   endMonth: r.end_month == null ? null : String(r.end_month),
   memo: String(r.memo),
+  living: r.living === 1,
 });
 
 export function listAccounts(db: Db): Account[] {
@@ -153,13 +157,13 @@ export function getItem(db: Db, id: number): Item | null {
 }
 
 const itemParams = (it: ItemInput) =>
-  [it.accountId, it.name, it.amount, it.variable ? 1 : 0, it.cycle, it.day, it.month, it.startMonth, it.endMonth, it.memo] as const;
+  [it.accountId, it.name, it.amount, it.variable ? 1 : 0, it.cycle, it.day, it.month, it.startMonth, it.endMonth, it.memo, it.living ? 1 : 0] as const;
 
 export function createItem(db: Db, it: ItemInput): Item {
   const r = db
     .prepare(
-      `INSERT INTO item (account_id, name, amount, variable, cycle, day, month, start_month, end_month, memo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO item (account_id, name, amount, variable, cycle, day, month, start_month, end_month, memo, living)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(...itemParams(it));
   return getItem(db, Number(r.lastInsertRowid))!;
@@ -168,7 +172,7 @@ export function createItem(db: Db, it: ItemInput): Item {
 export function updateItem(db: Db, id: number, it: ItemInput): Item | null {
   db.prepare(
     `UPDATE item SET account_id = ?, name = ?, amount = ?, variable = ?, cycle = ?, day = ?, month = ?,
-       start_month = ?, end_month = ?, memo = ? WHERE id = ?`,
+       start_month = ?, end_month = ?, memo = ?, living = ? WHERE id = ?`,
   ).run(...itemParams(it), id);
   return getItem(db, id);
 }

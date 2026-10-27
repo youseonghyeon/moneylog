@@ -6,7 +6,7 @@ const accounts: Account[] = [
   { id: 2, name: "대출·고지서", memo: "", sort: 1 },
   { id: 1, name: "생활비", memo: "", sort: 0 },
 ];
-const base = { variable: false, cycle: "monthly" as const, month: null, startMonth: null, endMonth: null, memo: "" };
+const base = { variable: false, cycle: "monthly" as const, month: null, startMonth: null, endMonth: null, memo: "", living: false };
 const items: Item[] = [
   { ...base, id: 1, accountId: 1, name: "식비", amount: 600_000, day: null },
   { ...base, id: 2, accountId: 2, name: "전기", amount: 50_000, day: 20, variable: true },

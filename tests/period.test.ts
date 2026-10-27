@@ -14,6 +14,7 @@ const item = (p: Partial<Item>): Item => ({
   startMonth: null,
   endMonth: null,
   memo: "",
+  living: false,
   ...p,
 });
 

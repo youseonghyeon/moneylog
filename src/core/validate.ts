@@ -54,6 +54,7 @@ export function checkItem(body: unknown): Checked<ItemInput> {
       startMonth,
       endMonth,
       memo,
+      living: b.living === true,
     },
   };
 }

@@ -30,6 +30,8 @@ export interface Item {
   /** 이 달까지 (YYYY-MM, 포함). 할부·대출 만기. null 이면 계속 */
   endMonth: string | null;
   memo: string;
+  /** 생활비 예상 항목 — 예정 탭(날짜별로 빠져나갈 돈)에서 뺀다. 생활비는 생활비 탭에서 실제 거래로 본다 */
+  living: boolean;
 }
 
 export type ItemInput = Omit<Item, "id">;
