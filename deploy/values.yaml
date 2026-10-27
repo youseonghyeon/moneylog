@@ -1,7 +1,7 @@
 image:
   repository: ghcr.io/youseonghyeon/moneylog
   # CI가 main push마다 커밋 SHA로 갱신한다. 첫 CI 전에는 latest.
-  tag: "b1253c2dafdefe1e3d44cfa72cf8dd602fe5af04"
+  tag: "2b81b1164110122ba7a5ee7f5d4a2be8d4a914e9"
   pullPolicy: IfNotPresent
 
 # ghcr 패키지가 private이면 pull secret 이름을 넣는다. public이면 비워 둔다.
