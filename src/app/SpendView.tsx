@@ -2,7 +2,7 @@
 import { useState } from "preact/hooks";
 import { summarizeSpends } from "../core/spend.ts";
 import type { Period, Spend } from "../core/types.ts";
-import { addDays, dayText, todayStr, won } from "./format.ts";
+import { addDays, calAmount, dayText, todayStr, won } from "./format.ts";
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const weekday = (d: string) => new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))).getUTCDay();
@@ -75,7 +75,7 @@ export function SpendView({ spends, period }: { spends: Spend[]; period: Period 
               return (
                 <button type="button" class={cls} style={shade && { background: shade }} aria-label={`${dayText(d)} ${won(t)}`} onClick={() => setPicked(d)}>
                   <span class="cal-day">{d.slice(8) === "01" || d === period.start ? `${+d.slice(5, 7)}.${+d.slice(8)}` : +d.slice(8)}</span>
-                  {t !== 0 && <span class="cal-amt">{t.toLocaleString("ko-KR")}</span>}
+                  {t !== 0 && <span class="cal-amt">{calAmount(t)}</span>}
                 </button>
               );
             })}

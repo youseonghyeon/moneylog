@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { periodOf } from "../src/core/period.ts";
 import { summarizeSpends } from "../src/core/spend.ts";
+import { calAmount } from "../src/app/format.ts";
 import type { Spend } from "../src/core/types.ts";
 
 const p = periodOf("2026-10", 20); // 10.20 ~ 11.19
@@ -39,5 +40,11 @@ describe("summarizeSpends", () => {
   });
   it("거래가 없으면 0", () => {
     expect(summarizeSpends([], p, "2026-10-22")).toMatchObject({ total: 0, byCategory: [], days: [], dailyAvg: 0 });
+  });
+});
+
+describe("calAmount (달력 칸)", () => {
+  it("10만 미만은 그대로, 이상은 만 단위 소수 한 자리", () => {
+    expect([99_999, 100_000, 134_727, 327_300, 1_234_567, -20_000].map(calAmount)).toEqual(["99,999", "10만", "13.5만", "32.7만", "123.5만", "-20,000"]);
   });
 });
