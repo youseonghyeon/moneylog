@@ -1,5 +1,5 @@
 // 생활비 탭: 그 기간 생활비 거래 — 합계·하루 평균 · 분류별 막대(누르면 그 분류 거래, 금액순/날짜순) · 달력(날마다 합계, 누르면 그날 거래)
-// 품목으로 나눈 결제(쿠팡페이 등)는 그날 목록에서 품목을 들여 쓰고, 분류별·분류 목록은 품목 단위로 센다
+// 품목으로 나눈 결제(쿠팡페이 등)는 그날 목록에서 품목을 세로선과 함께 들여 쓰고, 분류별·분류 목록은 품목 단위로 센다
 import { useEffect, useRef, useState } from "preact/hooks";
 import { budgetLeft, piecesOf, summarizeSpends } from "../core/spend.ts";
 import type { Period, Spend, SpendCategory } from "../core/types.ts";
@@ -153,7 +153,7 @@ export function SpendView({ spends, period, budget }: { spends: Spend[]; period:
                           {piecesOf(s).map((x) => (
                             <li>
                               <span class="part-name">
-                                ㄴ {x.part} <small>{x.category}</small>
+                                {x.part} <small>{x.category}</small>
                               </span>
                               <span class={x.amount < 0 ? "amt refund" : "amt"}>{won(x.amount)}</span>
                             </li>

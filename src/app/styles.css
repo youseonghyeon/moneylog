@@ -488,11 +488,12 @@ button.icon {
 .over {
   color: var(--error);
 }
-/* 품목으로 나눈 결제: 결제 아래 "ㄴ 품목 · 분류  금액" */
+/* 품목으로 나눈 결제: 결제 아래 세로선을 두고 들여 쓴 "품목 · 분류  금액" */
 .parts {
   list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
+  margin: 6px 0 0 2px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--line);
   font-size: 14px;
 }
 .parts li {
@@ -501,9 +502,9 @@ button.icon {
   gap: 12px;
   padding: 3px 0;
 }
+/* 분류는 품목 이름 아래 한 줄로 (이름이 길면 옆에 붙은 분류가 글자 단위로 쪼개진다) */
 .part-name small {
-  display: inline;
-  margin-left: 4px;
+  display: block;
 }
 .line.split > .amt {
   font-weight: 600;

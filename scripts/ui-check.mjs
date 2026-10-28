@@ -163,8 +163,8 @@ try {
     check((await picked.locator(".sum").innerText()) === "110,000원", "1일 칸을 누르면 그날 합계 110,000원 (환불 반영)");
     const split = picked.locator(".line.split");
     check(
-      (await split.locator(".parts li").allInnerTexts()).map((t) => t.replace(/\s+/g, " ")).join("|") === "ㄴ 삼겹살 식비 10,000원|ㄴ 세제 쇼핑 24,000원|ㄴ 나머지 쇼핑 46,000원",
-      "나눈 결제는 품목을 ㄴ 로 들여 쓴다 (차이는 '나머지')",
+      (await split.locator(".parts li").allInnerTexts()).map((t) => t.replace(/\s+/g, " ")).join("|") === "삼겹살 식비 10,000원|세제 쇼핑 24,000원|나머지 쇼핑 46,000원",
+      "나눈 결제는 품목을 결제 아래 들여 쓴다 (차이는 '나머지')",
     );
     await page.screenshot({ path: `${OUT}/02c-spend-split-mobile.png`, fullPage: true });
     check((await picked.locator(".amt.refund").count()) === 1, "환불은 흐리게");
