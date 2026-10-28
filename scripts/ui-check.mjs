@@ -198,6 +198,7 @@ try {
     (await page.locator(".summary .kv").allInnerTexts()).join("|").replace(/\s+/g, " ") === "주식 3,200,000원|적금 1,500,000원|보증금 14,000,000원|대출 120,000,000원",
     "잔액 탭 요약: 종류별 합계 (보증금 포함)",
   );
+  check((await page.locator(".summary .total").innerText()) === "-101,300,000원", "잔액 탭 합계 = 주식 + 적금 + 보증금 − 대출");
   const bal = acct("주식·적금·보증금·대출");
   check((await bal.locator(".kind h3").count()) === 4, "잔액은 주식·적금·보증금·대출로 묶인다");
   check((await bal.locator(".kind").nth(1).locator("small").innerText()).includes("2027-06 만기 ·"), "잔액 메모·기준일");

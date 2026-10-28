@@ -223,10 +223,13 @@ function BalancesDetail({ balances }: { balances: Balance[] }) {
 
 function BalanceView({ balances }: { balances: Balance[] }) {
   const sum = (k: Balance["kind"]) => balances.filter((b) => b.kind === k).reduce((s, b) => s + b.amount, 0);
+  // 합계 = 주식 + 적금 + 보증금 − 대출 (통장 잔액은 안 들어간다)
+  const net = sum("stock") + sum("saving") + sum("deposit") - sum("loan");
   return (
     <main class="layout">
       <aside class="summary">
-        <p class="caption">주식·적금·보증금·대출</p>
+        <p class="caption">합계 · 주식 + 적금 + 보증금 − 대출</p>
+        <p class="total">{won(net)}</p>
         <ul class="transfer">
           {BALANCE_KINDS.map((k) => (
             <li class="kv">
