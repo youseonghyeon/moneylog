@@ -76,6 +76,9 @@ try {
   await sp(today, "09:35", 3300, "카페·간식", "메가커피", "t2");
   await sp(first, "20:00", 50000, "쇼핑", "쿠팡", "t3");
   await sp(first, "20:10", -20000, "쇼핑", "쿠팡", "t4");
+  // 품목으로 나눈 결제: 80,000 = 삼겹살 10,000(식비) + 세제 24,000(쇼핑) + 나머지 46,000(원래 분류 쇼핑)
+  const cp = await sp(first, "11:30", 80000, "쇼핑", "쿠팡페이", "t5");
+  await post("PUT", `/api/spends/${cp.id}/parts`, { parts: [{ name: "삼겹살", amount: 10000, category: "식비" }, { name: "세제", amount: 24000, category: "쇼핑" }] });
   check((await fetch(BASE + "/api/spends", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ date: today, amount: 1, category: "식비", merchant: "x", ref: "t1" }) })).status === 409, "같은 ref 거래는 409");
 
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
@@ -135,18 +138,18 @@ try {
 
   // 지출 탭
   await page.getByRole("tab", { name: "생활비" }).click();
-  check((await total()) === "42,900원", "지출 합계 42,900원 (환불 −20,000 반영)");
+  check((await total()) === "122,900원", "생활비 합계 122,900원 (환불 −20,000 반영, 나눈 결제는 결제 금액 그대로)");
   check((await page.locator(".summary .put").first().innerText()).includes(`${now.getDate()}일째`), "하루 평균 · N일째");
-  // 생활비 예정액 600,000 − 쓴 돈 42,900 = 557,100 을 오늘 포함 남은 날로 나눈다
+  // 생활비 예정액 600,000 − 쓴 돈 122,900 = 477,100 을 오늘 포함 남은 날로 나눈다
   const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() + 1;
-  check((await page.locator(".budget .put").innerText()) === "예정 600,000원 · 남은 557,100원", "예정액·남은 금액");
+  check((await page.locator(".budget .put").innerText()) === "예정 600,000원 · 남은 477,100원", "예정액·남은 금액");
   check(
-    (await page.locator(".per-day").innerText()).replace(/\s+/g, " ") === `하루 ${Math.floor(557100 / daysLeft).toLocaleString("ko-KR")}원 사용 가능 · ${daysLeft}일 남음`,
+    (await page.locator(".per-day").innerText()).replace(/\s+/g, " ") === `하루 ${Math.floor(477100 / daysLeft).toLocaleString("ko-KR")}원 사용 가능 · ${daysLeft}일 남음`,
     `하루 사용 가능 금액 (${daysLeft}일 남음)`,
   );
   check(
     (await page.locator(".cats .cat").allInnerTexts()).join(",") === "쇼핑,식비,카페·간식",
-    "분류는 큰 것부터 (쇼핑 30,000 · 식비 9,600 · 카페 3,300)",
+    "분류는 큰 것부터 (쇼핑 100,000 · 식비 19,600 · 카페 3,300 — 나눈 결제는 품목 분류로)",
   );
   const cells = page.locator(".cal-cell:not(.out)");
   const monthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -157,17 +160,24 @@ try {
   if (today !== first) {
     check((await page.locator(".cal-cell.today .cal-amt").innerText()) === "12,900", "오늘 칸에 그날 합계");
     await cells.first().click();
-    check((await picked.locator(".sum").innerText()) === "30,000원", "1일 칸을 누르면 그날 합계 30,000원 (환불 반영)");
+    check((await picked.locator(".sum").innerText()) === "110,000원", "1일 칸을 누르면 그날 합계 110,000원 (환불 반영)");
+    const split = picked.locator(".line.split");
+    check(
+      (await split.locator(".parts li").allInnerTexts()).map((t) => t.replace(/\s+/g, " ")).join("|") === "ㄴ 삼겹살 식비 10,000원|ㄴ 세제 쇼핑 24,000원|ㄴ 나머지 쇼핑 46,000원",
+      "나눈 결제는 품목을 ㄴ 로 들여 쓴다 (차이는 '나머지')",
+    );
+    await page.screenshot({ path: `${OUT}/02c-spend-split-mobile.png`, fullPage: true });
     check((await picked.locator(".amt.refund").count()) === 1, "환불은 흐리게");
     await page.locator(".cal-cell.today").click();
   }
   // 분류를 누르면 그 분류 거래 — 금액 큰 순, 날짜순으로 바꿀 수 있다
   const catList = page.locator('section[aria-label="고른 분류"]');
   await page.locator(".cat-pick", { hasText: "쇼핑" }).click();
-  check((await catList.locator("header .sum").innerText()) === "30,000원", "쇼핑을 누르면 쇼핑 거래 목록 (합계 30,000원)");
-  check((await catList.locator(".amt").allInnerTexts()).join("|") === "50,000원|-20,000원", "처음엔 금액 큰 순");
+  check((await catList.locator("header .sum").innerText()) === "100,000원", "쇼핑을 누르면 쇼핑 목록 (합계 100,000원, 나눈 결제는 품목 단위)");
+  check((await catList.locator(".amt").allInnerTexts()).join("|") === "50,000원|46,000원|24,000원|-20,000원", "처음엔 금액 큰 순");
+  check((await catList.locator(".line", { hasText: "세제" }).locator("small").innerText()).startsWith("쿠팡페이"), "품목 줄에 어느 결제인지");
   await catList.getByRole("button", { name: "날짜순" }).click();
-  check((await catList.locator(".amt").allInnerTexts()).join("|") === "-20,000원|50,000원", "날짜순: 같은 날이면 늦은 시각부터");
+  check((await catList.locator(".amt").allInnerTexts()).join("|") === "-20,000원|50,000원|24,000원|46,000원", "날짜순: 같은 날이면 늦은 시각부터");
   await page.screenshot({ path: `${OUT}/02b-spend-category-mobile.png`, fullPage: true });
   await page.locator(".cat-pick", { hasText: "쇼핑" }).click();
   check((await catList.count()) === 0 && (await page.locator('section[aria-label="고른 날"]').count()) === 1, "같은 분류를 다시 누르면 날짜 보기로");

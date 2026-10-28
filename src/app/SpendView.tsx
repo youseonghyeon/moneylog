@@ -1,6 +1,7 @@
 // 생활비 탭: 그 기간 생활비 거래 — 합계·하루 평균 · 분류별 막대(누르면 그 분류 거래, 금액순/날짜순) · 달력(날마다 합계, 누르면 그날 거래)
+// 품목으로 나눈 결제(쿠팡페이 등)는 그날 목록에서 품목을 들여 쓰고, 분류별·분류 목록은 품목 단위로 센다
 import { useEffect, useRef, useState } from "preact/hooks";
-import { budgetLeft, summarizeSpends } from "../core/spend.ts";
+import { budgetLeft, piecesOf, summarizeSpends } from "../core/spend.ts";
 import type { Period, Spend, SpendCategory } from "../core/types.ts";
 import { addDays, calAmount, dayText, shortDate, todayStr, won } from "./format.ts";
 import { useWide } from "./useWide.ts";
@@ -34,9 +35,9 @@ export function SpendView({ spends, period, budget }: { spends: Spend[]; period:
   // 분류를 누르면 아래 목록이 그 분류 거래로 바뀐다 (다시 누르거나 날짜를 누르면 날짜 보기로)
   const [cat, setCat] = useState<SpendCategory | null>(null);
   const [sort, setSort] = useState<"amount" | "date">("amount");
-  const catSpends = cat ? r.days.flatMap((d) => d.spends).filter((s) => s.category === cat) : [];
-  if (sort === "amount") catSpends.sort((a, b) => b.amount - a.amount || b.date.localeCompare(a.date));
-  else catSpends.sort((a, b) => b.date.localeCompare(a.date) || (b.time ?? "").localeCompare(a.time ?? ""));
+  const catPieces = cat ? r.days.flatMap((d) => d.spends.flatMap(piecesOf)).filter((x) => x.category === cat) : [];
+  if (sort === "amount") catPieces.sort((a, b) => b.amount - a.amount || b.spend.date.localeCompare(a.spend.date));
+  else catPieces.sort((a, b) => b.spend.date.localeCompare(a.spend.date) || (b.spend.time ?? "").localeCompare(a.spend.time ?? ""));
   const pickCat = (c: SpendCategory) => {
     setCat(cat === c ? null : c);
     setSort("amount");
@@ -110,9 +111,9 @@ export function SpendView({ spends, period, budget }: { spends: Spend[]; period:
           <section class="acct unfold" aria-label="고른 분류" ref={listRef}>
             <header>
               <h2>
-                {cat} <small class="count">{catSpends.length}건</small>
+                {cat} <small class="count">{catPieces.length}건</small>
               </h2>
-              <span class="sum">{won(catSpends.reduce((n, s) => n + s.amount, 0))}</span>
+              <span class="sum">{won(catPieces.reduce((n, x) => n + x.amount, 0))}</span>
             </header>
             <div class="sort" role="group" aria-label="정렬">
               {(["amount", "date"] as const).map((k) => (
@@ -122,14 +123,14 @@ export function SpendView({ spends, period, budget }: { spends: Spend[]; period:
               ))}
             </div>
             <ul class="lines">
-              {catSpends.map((s) => (
+              {catPieces.map(({ spend: s, amount, part }) => (
                 <li class="line">
                   <span class="date">{shortDate(s.date)}</span>
                   <span class="name">
-                    {s.merchant}
-                    <small>{[s.time, s.source].filter(Boolean).join(" · ")}</small>
+                    {part ?? s.merchant}
+                    <small>{[part && s.merchant, s.time, s.source].filter(Boolean).join(" · ")}</small>
                   </span>
-                  <span class={s.amount < 0 ? "amt refund" : "amt"}>{won(s.amount)}</span>
+                  <span class={amount < 0 ? "amt refund" : "amt"}>{won(amount)}</span>
                 </li>
               ))}
             </ul>
@@ -143,10 +144,22 @@ export function SpendView({ spends, period, budget }: { spends: Spend[]; period:
             {day ? (
               <ul class="lines">
                 {day.spends.map((s) => (
-                  <li class="line">
+                  <li class={s.parts.length ? "line split" : "line"}>
                     <span class="name">
                       {s.merchant}
-                      <small>{[s.time, s.category, s.source].filter(Boolean).join(" · ")}</small>
+                      <small>{[s.time, s.parts.length ? `${s.parts.length}개 품목` : s.category, s.source].filter(Boolean).join(" · ")}</small>
+                      {s.parts.length > 0 && (
+                        <ul class="parts">
+                          {piecesOf(s).map((x) => (
+                            <li>
+                              <span class="part-name">
+                                ㄴ {x.part} <small>{x.category}</small>
+                              </span>
+                              <span class={x.amount < 0 ? "amt refund" : "amt"}>{won(x.amount)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </span>
                     <span class={s.amount < 0 ? "amt refund" : "amt"}>{won(s.amount)}</span>
                   </li>

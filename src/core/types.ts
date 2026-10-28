@@ -89,9 +89,18 @@ export interface Spend {
   source: string;
   /** 같은 거래를 두 번 넣지 않게 하는 키 (파일의 승인번호·시각 등) */
   ref: string | null;
+  /** 한 결제를 품목별로 나눈 것 (예: 쿠팡페이 80,000 → 삼겹살 10,000 · 식비 …). 없으면 [] */
+  parts: SpendPart[];
 }
 
-export type SpendInput = Omit<Spend, "id">;
+/** 결제 안의 품목 하나. 분류별 합계는 나눈 결제를 품목의 분류로 센다 */
+export interface SpendPart {
+  name: string;
+  amount: number;
+  category: SpendCategory;
+}
+
+export type SpendInput = Omit<Spend, "id" | "parts">;
 
 export const SPEND_CATEGORIES = [
   "식비", "카페·간식", "편의점", "담배", "쇼핑", "세탁", "미용", "구독·IT", "게임", "병원", "교통", "밥값 송금", "기타",

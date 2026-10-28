@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { periodOf } from "../src/core/period.ts";
-import { budgetLeft, summarizeSpends } from "../src/core/spend.ts";
+import { budgetLeft, piecesOf, summarizeSpends } from "../src/core/spend.ts";
 import { calAmount } from "../src/app/format.ts";
 import type { Spend } from "../src/core/types.ts";
 
 const p = periodOf("2026-10", 20); // 10.20 ~ 11.19
 let id = 0;
 const s = (date: string, amount: number, category: Spend["category"], time: string | null = null): Spend =>
-  ({ id: ++id, date, time, amount, category, merchant: "m", source: "", ref: null });
+  ({ id: ++id, date, time, amount, category, merchant: "m", source: "", ref: null, parts: [] });
 const spends = [
   s("2026-10-20", 9600, "식비", "12:05"),
   s("2026-10-20", 3300, "카페·간식", "09:35"),
@@ -60,5 +60,38 @@ describe("budgetLeft (생활비 예정액)", () => {
     expect(budgetLeft(600_000, 650_000, p, "2026-11-01")).toEqual({ left: -50_000, daysLeft: 19, perDay: 0 });
     expect(budgetLeft(600_000, 100_000, p, "2026-12-01")).toEqual({ left: 500_000, daysLeft: 0, perDay: 0 });
     expect(budgetLeft(600_000, 0, p, "2026-10-01")).toEqual({ left: 600_000, daysLeft: 31, perDay: 19_354 });
+  });
+});
+
+describe("품목으로 나눈 결제 (쿠팡페이 등)", () => {
+  const coupang: Spend = {
+    ...s("2026-10-25", 80_000, "쇼핑", "11:30"),
+    merchant: "쿠팡페이",
+    parts: [
+      { name: "삼겹살", amount: 10_000, category: "식비" },
+      { name: "세제", amount: 24_000, category: "쇼핑" },
+      { name: "라면", amount: 43_000, category: "식비" },
+    ],
+  };
+  it("품목마다 + 결제 금액과 차이는 '나머지'로 원래 분류에", () => {
+    expect(piecesOf(coupang).map((x) => [x.part, x.category, x.amount])).toEqual([
+      ["삼겹살", "식비", 10_000],
+      ["세제", "쇼핑", 24_000],
+      ["라면", "식비", 43_000],
+      ["나머지", "쇼핑", 3_000],
+    ]);
+    expect(piecesOf({ ...coupang, parts: coupang.parts.map((x, i) => (i === 2 ? { ...x, amount: 46_000 } : x)) }).map((x) => x.part)).toEqual(["삼겹살", "세제", "라면"]);
+  });
+  it("나누지 않은 결제는 통째로", () => {
+    expect(piecesOf(spends[0]!)).toEqual([{ spend: spends[0], category: "식비", amount: 9_600, part: null }]);
+  });
+  it("분류별 합계는 품목 분류로, 날짜 합계·전체 합계는 결제 금액 그대로", () => {
+    const r = summarizeSpends([coupang], p, "2026-10-27");
+    expect(r.total).toBe(80_000);
+    expect(r.days[0]!.total).toBe(80_000);
+    expect(r.byCategory).toEqual([
+      { category: "식비", total: 53_000 },
+      { category: "쇼핑", total: 27_000 },
+    ]);
   });
 });

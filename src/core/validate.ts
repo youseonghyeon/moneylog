@@ -1,7 +1,7 @@
 // API 입력 검사. 실패 문구는 화면에 그대로 보이므로 "무엇이 잘못됐고 어떻게 고치나" 를 담는다.
 import { isDate, isLabel } from "./period.ts";
 import { BALANCE_KINDS, SPEND_CATEGORIES } from "./types.ts";
-import type { BalanceInput, BalanceKind, DepositInput, ItemInput, SpendCategory, SpendInput } from "./types.ts";
+import type { BalanceInput, BalanceKind, DepositInput, ItemInput, SpendCategory, SpendInput, SpendPart } from "./types.ts";
 
 export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -101,4 +101,21 @@ export function checkSpend(body: unknown): Checked<SpendInput> {
     ok: true,
     value: { date: b.date, time, amount: b.amount, category: b.category as SpendCategory, merchant: merchant.value, source, ref },
   };
+}
+
+/** 결제 하나의 품목 목록 (통째로 바꾼다 — 빈 목록이면 나눈 것을 지운다) */
+export function checkParts(body: unknown): Checked<SpendPart[]> {
+  const list = (body as Record<string, unknown> | null)?.parts;
+  if (!Array.isArray(list)) return fail("parts 배열을 넣어 주세요 (예: { parts: [{ name, amount, category }] }).");
+  if (list.length > 100) return fail("품목은 100개까지 넣을 수 있습니다.");
+  const out: SpendPart[] = [];
+  for (const [i, p] of list.entries()) {
+    const b = (p ?? {}) as Record<string, unknown>;
+    const name = checkName(b.name);
+    if (!name.ok) return fail(`${i + 1}번째 품목: 이름을 50자 이하로 넣어 주세요.`);
+    if (!isInt(b.amount, -MAX_AMOUNT, MAX_AMOUNT) || b.amount === 0) return fail(`${i + 1}번째 품목: 금액은 0 이 아닌 정수(원)로 넣어 주세요.`);
+    if (!SPEND_CATEGORIES.includes(b.category as SpendCategory)) return fail(`${i + 1}번째 품목: 분류는 ${SPEND_CATEGORIES.join("·")} 중 하나로 넣어 주세요.`);
+    out.push({ name: name.value, amount: b.amount, category: b.category as SpendCategory });
+  }
+  return { ok: true, value: out };
 }

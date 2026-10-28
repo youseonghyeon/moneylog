@@ -209,6 +209,39 @@ describe("API", () => {
     expect((await call("GET", "/api/budget/2026-10")).json.amount).toBeNull();
   });
 
+  it("결제를 품목으로 나눈다: 통째로 바꾸고, 빈 목록이면 지우고, 결제를 지우면 같이 지워진다", async () => {
+    const c = await call("POST", "/api/spends", { date: "2026-10-25", amount: 80_000, category: "쇼핑", merchant: "쿠팡페이", ref: "cp1" });
+    expect(c.json.parts).toEqual([]);
+    const parts = [
+      { name: "삼겹살", amount: 10_000, category: "식비" },
+      { name: "세제", amount: 24_000, category: "쇼핑" },
+    ];
+    const r = await call("PUT", `/api/spends/${c.json.id}/parts`, { parts });
+    expect(r.json.parts).toEqual(parts);
+    let list = (await call("GET", "/api/spends?period=2026-10")).json;
+    expect(list[0].parts).toEqual(parts);
+    await call("PUT", `/api/spends/${c.json.id}/parts`, { parts: [parts[1]] });
+    expect((await call("GET", "/api/spends?period=2026-10")).json[0].parts).toEqual([parts[1]]);
+    await call("PUT", `/api/spends/${c.json.id}/parts`, { parts: [] });
+    expect((await call("GET", "/api/spends?period=2026-10")).json[0].parts).toEqual([]);
+    await call("PUT", `/api/spends/${c.json.id}/parts`, { parts });
+    await call("DELETE", `/api/spends/${c.json.id}`);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM spend_part").get()).toEqual(expect.objectContaining({ n: 0 }));
+    const bad: [unknown, RegExp][] = [
+      [{}, /parts 배열/],
+      [{ parts: [{ name: "", amount: 1, category: "식비" }] }, /1번째 품목: 이름/],
+      [{ parts: [{ name: "a", amount: 0, category: "식비" }] }, /1번째 품목: 금액/],
+      [{ parts: [parts[0], { name: "a", amount: 1, category: "술" }] }, /2번째 품목: 분류/],
+    ];
+    const d = await call("POST", "/api/spends", { date: "2026-10-25", amount: 1, category: "쇼핑", merchant: "x", ref: "cp2" });
+    for (const [b, msg] of bad) {
+      const x = await call("PUT", `/api/spends/${d.json.id}/parts`, b);
+      expect(x.status, JSON.stringify(b)).toBe(400);
+      expect(x.json.error).toMatch(msg);
+    }
+    expect((await call("PUT", "/api/spends/999/parts", { parts })).status).toBe(404);
+  });
+
   it("생활비 거래 입력 검사", async () => {
     const sp = { date: "2026-10-20", amount: 1, category: "식비", merchant: "a" };
     const cases: [unknown, RegExp][] = [
@@ -261,10 +294,10 @@ describe("DB 파일", () => {
       const path = join(dir, "v1.db");
       const a = openDb(path);
       a.exec("INSERT INTO item (account_id, name, amount, cycle) VALUES (3, '월세', 550000, 'monthly')");
-      a.exec("DROP TABLE deposit; DROP TABLE balance; DROP TABLE spend; DROP TABLE budget; ALTER TABLE item DROP COLUMN living; PRAGMA user_version = 1;");
+      a.exec("DROP TABLE deposit; DROP TABLE balance; DROP TABLE spend_part; DROP TABLE spend; DROP TABLE budget; ALTER TABLE item DROP COLUMN living; PRAGMA user_version = 1;");
       a.close();
       const b = openDb(path);
-      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 5 });
+      expect(b.prepare("PRAGMA user_version").get()).toEqual({ user_version: 6 });
       expect(b.prepare("SELECT COUNT(*) AS n FROM spend").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT COUNT(*) AS n FROM deposit").get()).toEqual(expect.objectContaining({ n: 0 }));
       expect(b.prepare("SELECT COUNT(*) AS n FROM balance").get()).toEqual(expect.objectContaining({ n: 0 }));

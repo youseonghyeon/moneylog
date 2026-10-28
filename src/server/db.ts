@@ -2,6 +2,7 @@
 // 스키마 변경은 MIGRATIONS 끝에 붙이고 PRAGMA user_version 으로 어디까지 적용했는지 센다.
 import { DatabaseSync } from "node:sqlite";
 import { BALANCE_KINDS } from "../core/types.ts";
+import type { SpendPart } from "../core/types.ts";
 import type { Account, Balance, BalanceInput, BalanceKind, Deposit, DepositInput, Item, ItemInput, Override, Settings, Spend, SpendCategory, SpendInput } from "../core/types.ts";
 
 export type Db = DatabaseSync;
@@ -74,6 +75,17 @@ const MIGRATIONS = [
   `,
   `
   CREATE TABLE budget (period TEXT PRIMARY KEY, amount INTEGER NOT NULL);
+  `,
+  `
+  CREATE TABLE spend_part (
+    id INTEGER PRIMARY KEY,
+    spend_id INTEGER NOT NULL REFERENCES spend(id) ON DELETE CASCADE,
+    sort INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    category TEXT NOT NULL
+  );
+  CREATE INDEX spend_part_spend ON spend_part (spend_id);
   `,
 ];
 
@@ -302,10 +314,44 @@ const toSpend = (r: Row): Spend => ({
   merchant: String(r.merchant),
   source: String(r.source),
   ref: r.ref == null ? null : String(r.ref),
+  parts: [],
 });
 
+const toPart = (r: Row): SpendPart => ({ name: String(r.name), amount: Number(r.amount), category: String(r.category) as SpendCategory });
+
 export function listSpends(db: Db, start: string, end: string): Spend[] {
-  return (db.prepare("SELECT * FROM spend WHERE date BETWEEN ? AND ? ORDER BY date, time, id").all(start, end) as Row[]).map(toSpend);
+  const spends = (db.prepare("SELECT * FROM spend WHERE date BETWEEN ? AND ? ORDER BY date, time, id").all(start, end) as Row[]).map(toSpend);
+  const byId = new Map(spends.map((s) => [s.id, s]));
+  const parts = db
+    .prepare(
+      `SELECT p.* FROM spend_part p JOIN spend s ON s.id = p.spend_id
+       WHERE s.date BETWEEN ? AND ? ORDER BY p.spend_id, p.sort`,
+    )
+    .all(start, end) as Row[];
+  for (const p of parts) byId.get(Number(p.spend_id))?.parts.push(toPart(p));
+  return spends;
+}
+
+export function getSpend(db: Db, id: number): Spend | null {
+  const r = db.prepare("SELECT * FROM spend WHERE id = ?").get(id) as Row | undefined;
+  if (!r) return null;
+  const s = toSpend(r);
+  s.parts = (db.prepare("SELECT * FROM spend_part WHERE spend_id = ? ORDER BY sort").all(id) as Row[]).map(toPart);
+  return s;
+}
+
+/** 결제 하나의 품목을 통째로 바꾼다 (빈 목록이면 지운다) */
+export function setSpendParts(db: Db, id: number, parts: SpendPart[]): void {
+  db.exec("BEGIN");
+  try {
+    db.prepare("DELETE FROM spend_part WHERE spend_id = ?").run(id);
+    const ins = db.prepare("INSERT INTO spend_part (spend_id, sort, name, amount, category) VALUES (?, ?, ?, ?, ?)");
+    parts.forEach((p, i) => ins.run(id, i, p.name, p.amount, p.category));
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
 }
 
 /** 같은 ref 가 이미 있으면 null (두 번 넣지 않는다) */

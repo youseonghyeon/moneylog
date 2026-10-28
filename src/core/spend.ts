@@ -1,6 +1,23 @@
 // 기간 하나의 생활비 요약 — 분류별 합계 · 날짜별 합계 · 하루 평균.
 import type { Period, Spend, SpendCategory } from "./types.ts";
 
+/** 분류로 셀 때의 한 덩어리: 나누지 않은 결제는 통째로, 나눈 결제는 품목마다 + 품목 합과 결제 금액의 차이("나머지", 배송비·할인 등) */
+export interface SpendPiece {
+  spend: Spend;
+  category: SpendCategory;
+  amount: number;
+  /** 품목 이름 — 나누지 않은 결제면 null */
+  part: string | null;
+}
+
+export function piecesOf(s: Spend): SpendPiece[] {
+  if (s.parts.length === 0) return [{ spend: s, category: s.category, amount: s.amount, part: null }];
+  const pieces: SpendPiece[] = s.parts.map((p) => ({ spend: s, category: p.category, amount: p.amount, part: p.name }));
+  const rest = s.amount - s.parts.reduce((n, p) => n + p.amount, 0);
+  if (rest !== 0) pieces.push({ spend: s, category: s.category, amount: rest, part: "나머지" });
+  return pieces;
+}
+
 export interface SpendDay {
   date: string;
   total: number;
@@ -25,7 +42,7 @@ export function summarizeSpends(spends: Spend[], period: Period, today: string):
   const cat = new Map<SpendCategory, number>();
   const day = new Map<string, Spend[]>();
   for (const s of inPeriod) {
-    cat.set(s.category, (cat.get(s.category) ?? 0) + s.amount);
+    for (const p of piecesOf(s)) cat.set(p.category, (cat.get(p.category) ?? 0) + p.amount);
     day.set(s.date, [...(day.get(s.date) ?? []), s]);
   }
   const total = inPeriod.reduce((n, s) => n + s.amount, 0);

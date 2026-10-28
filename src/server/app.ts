@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { isLabel, periodOf } from "../core/period.ts";
 import { buildPlan } from "../core/plan.ts";
-import { checkAmount, checkBalance, checkDeposit, checkItem, checkName, checkSpend } from "../core/validate.ts";
+import { checkAmount, checkBalance, checkDeposit, checkItem, checkName, checkParts, checkSpend } from "../core/validate.ts";
 import * as store from "./db.ts";
 import type { Db } from "./db.ts";
 
@@ -197,6 +197,16 @@ export function createApp(db: Db, today: () => string = localToday): Hono {
     if (!r.ok) return bad(c, r.error);
     const s = store.createSpend(db, r.value);
     return s ? c.json(s, 201) : bad(c, `이미 넣은 거래입니다 (ref ${r.value.ref}). 다시 넣지 않았습니다.`, 409);
+  });
+
+  // 결제 하나를 품목별로 나눈다 (예: 쿠팡페이 → 삼겹살 · 식비, 세제 · 쇼핑). 통째로 바꾸고, 빈 목록이면 지운다
+  app.put("/api/spends/:id/parts", async (c) => {
+    const id = idParam(c);
+    if (!id || !store.getSpend(db, id)) return bad(c, "거래가 없습니다. 화면을 새로 고쳐 주세요.", 404);
+    const r = checkParts(await body(c));
+    if (!r.ok) return bad(c, r.error);
+    store.setSpendParts(db, id, r.value);
+    return c.json(store.getSpend(db, id));
   });
 
   app.delete("/api/spends/:id", (c) => {
