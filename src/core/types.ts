@@ -103,7 +103,7 @@ export interface SpendPart {
 export type SpendInput = Omit<Spend, "id" | "parts">;
 
 export const SPEND_CATEGORIES = [
-  "식비", "카페·간식", "편의점", "담배", "쇼핑", "세탁", "미용", "구독·IT", "게임", "병원", "교통", "밥값 송금", "기타",
+  "식비", "유흥비", "카페·간식", "편의점", "담배", "쇼핑", "세탁", "미용", "구독·IT", "게임", "병원", "교통", "밥값 송금", "기타",
 ] as const;
 export type SpendCategory = (typeof SPEND_CATEGORIES)[number];
 
