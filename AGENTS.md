@@ -32,6 +32,7 @@
   - `types.ts` 도메인 타입(금액은 원 단위 정수) · `period.ts` 기간(이름 = 시작하는 달 YYYY-MM, 시작일 1~28)·항목이 나가는 날 · `plan.ts` 계좌별 나갈 돈·넣은 돈 합계 · `spend.ts` 기간 생활비 요약(분류별·날짜별·하루 평균)·예정액 대비 하루 사용 가능 금액 · `validate.ts` 입력 검사(실패 문구는 화면에 그대로 나간다 — 무엇을 어떻게 고치나)
 - `src/server/` `db.ts` 스키마·마이그레이션(`PRAGMA user_version`, 끝에만 붙인다)·쿼리 · `app.ts` `/api` 라우트(오류는 `{ error }`) · `main.ts` 진입점(+ `/healthz`, 정적 서빙, 캐시 헤더, SIGTERM)
 - `src/app/` Preact 화면(보기 전용). `App.tsx` 예정 탭·잔액 탭(`#balance`), `SpendView.tsx` 생활비 탭(`#spend`), `api.ts` 읽기 호출만
+- `public/mock/invest.html` 투자 탭 시안(예시 데이터, `/mock/invest.html`) — 사용자가 모양을 본 뒤 실제 탭으로 옮기면 지운다
 - `tests/` vitest — 기간 경계(말일·2월·연말·시작일 1~28 × 날짜 1~31 전수), 계획 합계, 생활비 요약·하루 사용 가능 금액, API(실제 HTTP 요청 모양, 메모리 DB, 옛 DB 마이그레이션)
 - `scripts/ui-check.mjs` 운영과 같은 서버를 빈 임시 DB·포트 5299 로 띄워 API 로 데이터를 넣고 Playwright 로 화면 확인(입력 수단이 없는지도), `.shots/` 에 스크린샷
 
@@ -59,7 +60,7 @@
 ## 사용자와 일하는 방식
 - 한국어 존댓말 어미, 짧고 직설적으로.
 - 큰 화면 변경·새 기능은 방향을 먼저 보여 주고 확인받는다. 사용자가 "~할까?"라고 물으면 추천만 답하고 고치지 않는다 — 지시가 있을 때만 바꾼다.
-- 커밋은 아래 검증 통과 후, 경로를 지정해 stage(`git add -A` 금지). 화면·코드 변경은 운영 데이터로 미리 본 뒤 "push할까요?"로 묻고, 승인되면 `git pull --rebase` 후 push 만 한다 — push 뒤 CI·배포 확인(대기 루프)은 하지 않는다(사용자가 확인). 원격 생성·클러스터 쓰기(`kubectl apply`)는 사용자 몫.
+- 커밋은 아래 검증 통과 후, 경로를 지정해 stage(`git add -A` 금지). 화면·코드 변경은 운영 데이터로 미리 본 뒤 묻지 않고 `git pull --rebase` 후 push 한다(사용자 명시 요청 2026-10-30) — push 뒤 CI·배포 확인(대기 루프)은 하지 않는다(사용자가 확인). 원격 생성·클러스터 쓰기(`kubectl apply`)는 사용자 몫.
 - 미리보기: 로컬 번들 + 운영 데이터는 Playwright `page.route("**/api/**")` 로 GET 만 운영에 넘겨 본다(쓰기는 막는다).
 
 ## 배포 (kube-sim·net-sim 과 같은 흐름, 차이는 서버·PVC·노출 범위)
