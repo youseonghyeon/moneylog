@@ -553,3 +553,25 @@ button.icon {
   min-height: 60dvh;
   padding: 16px;
 }
+
+/* 투자 탭 (시안): 자산군 막대 — 채움 = 지금 비율, 세로선 = 목표 비율 */
+.invest .mock { font-size: 11px; color: var(--warn); border: 1px solid var(--warn); border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; }
+.alloc { list-style: none; margin: 6px 0 12px; padding: 0; }
+.alloc li { padding: 8px 0; border-top: 1px solid var(--line); }
+.alloc li:first-child { border-top: 0; }
+.alloc .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.alloc .pct { font-variant-numeric: tabular-nums; font-weight: 600; }
+.alloc small { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.alloc .sub { padding: 6px 0 0 12px; border-left: 2px solid var(--line); margin: 6px 0 0 2px; }
+.alloc .sub .row { font-size: 13px; padding: 3px 0; }
+.alloc .sub .row span:first-child { color: var(--ink-2); }
+.tbar { position: relative; height: 8px; border-radius: 4px; background: var(--surface-2); margin-top: 6px; }
+.tbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--ink-2); }
+.tbar b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--accent); }
+.legend { color: var(--ink-2); font-size: 12px; display: flex; gap: 12px; margin: 2px 0 0; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 8px; border-radius: 2px; background: var(--ink-2); margin-right: 4px; }
+.legend span.t::before { width: 2px; height: 10px; background: var(--accent); }
+.invest .amt .after { display: block; font-size: 12px; color: var(--ink-2); }
+.invest .acct + .acct { margin-top: 12px; }
+.invest .grp { padding: 10px 16px 2px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; color: var(--ink-2); }
+.invest .grp b { font-variant-numeric: tabular-nums; }

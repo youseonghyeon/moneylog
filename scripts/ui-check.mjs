@@ -206,6 +206,15 @@ try {
   check((await bal.locator(".kind h3").count()) === 4, "잔액은 주식·적금·보증금·대출로 묶인다");
   check((await bal.locator(".kind").nth(1).locator("small").innerText()).includes("2027-06 만기 ·"), "잔액 메모·기준일");
   await page.screenshot({ path: `${OUT}/07-balance-mobile.png`, fullPage: true });
+
+  // 투자 탭 (시안 — 예시 데이터)
+  await page.getByRole("tab", { name: "투자" }).click();
+  check(page.url().endsWith("#invest"), "투자 탭 주소 #invest");
+  check((await page.locator(".alloc > li").count()) === 4, "투자 탭: 자산군 4개 (주식·채권·금·현금)");
+  check((await page.locator(".invest .mock").innerText()) === "예시 데이터", "투자 탭은 예시 데이터라고 표시");
+  const buys = await acct("넣을 돈 나누기").locator(".line .amt").evaluateAll((els) => els.map((e) => Number(e.firstChild.textContent.replace(/[^0-9]/g, ""))));
+  check(buys.reduce((a, b) => a + b, 0) === 500000, `넣을 돈 나누기 합 = 500,000 (${buys.join("+")})`);
+  await page.screenshot({ path: `${OUT}/08-invest-mobile.png`, fullPage: true });
   await page.getByRole("tab", { name: "예정" }).click();
 
   // 넓은 화면 · 다크

@@ -1,6 +1,6 @@
 // 한 화면, 탭 셋. 보기 전용 — 입력은 사용자 대신 에이전트가 API 로 넣는다(사용자 결정 2026-10-27).
 // 예정: 계좌별 입금 필요 금액 · 날짜별로 빠져나갈 돈과 남은 금액(마지막에 0원). 생활비 항목·입금·잔액은 안 보인다
-// 생활비: 그 기간 생활비 거래 — 분류별 · 달력 / 잔액: 주식·적금·보증금·대출
+// 생활비: 그 기간 생활비 거래 — 분류별 · 달력 / 잔액: 주식·적금·보증금·대출 / 투자: 자산 배분 시안(예시 데이터)
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { labelOf, shiftLabel } from "../core/period.ts";
@@ -8,16 +8,21 @@ import { BALANCE_KINDS } from "../core/types.ts";
 import type { Balance, Plan, PlanLine, Settings, Spend } from "../core/types.ts";
 import { api } from "./api.ts";
 import { dateText, KIND_NAMES, labelText, shortDate, todayStr, won } from "./format.ts";
+import { InvestView } from "./InvestView.tsx";
 import { SpendView } from "./SpendView.tsx";
 import { useWide } from "./useWide.ts";
 
-type Tab = "plan" | "spend" | "balance";
+type Tab = "plan" | "spend" | "balance" | "invest";
 const TABS: [Tab, string][] = [
   ["plan", "예정"],
   ["spend", "생활비"],
   ["balance", "잔액"],
+  ["invest", "투자"],
 ];
-const tabOf = (): Tab => (location.hash === "#spend" ? "spend" : location.hash === "#balance" ? "balance" : "plan");
+const tabOf = (): Tab => {
+  const h = location.hash.slice(1);
+  return h === "spend" || h === "balance" || h === "invest" ? h : "plan";
+};
 
 export function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -95,6 +100,7 @@ export function App() {
       {tab === "plan" && <PlanView plan={plan} />}
       {tab === "spend" && <SpendView spends={spends} period={plan.period} budget={budget} />}
       {tab === "balance" && <BalanceView balances={balances} />}
+      {tab === "invest" && <InvestView />}
     </div>
   );
 }
