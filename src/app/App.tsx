@@ -108,7 +108,9 @@ function PlanView({ plan }: { plan: Plan }) {
   const accounts = plan.accounts
     .map((a) => {
       const lines = a.lines.filter((l) => !l.item.living);
-      return { account: a.account, lines, total: lines.reduce((s, l) => s + l.amount, 0) };
+      // 남은 = 아직 안 나간 줄 합계 ("나감" 표시와 같은 기준)
+      const rest = lines.filter((l) => !(l.due <= today && !l.estimated)).reduce((s, l) => s + l.amount, 0);
+      return { account: a.account, lines, total: lines.reduce((s, l) => s + l.amount, 0), rest };
     })
     .filter((a) => a.lines.length > 0);
   const lines = accounts.flatMap((a) => a.lines);
@@ -142,7 +144,16 @@ function PlanView({ plan }: { plan: Plan }) {
         {estimated > 0 && <p class="hint">예상 금액 {estimated}건 포함</p>}
         <h3>계좌별</h3>
         <ul class="transfer">
-          {accounts.map((a) => row(a.account.id, <span>{a.account.name}</span>, <b>{won(a.total)}</b>))}
+          {accounts.map((a) =>
+            row(
+              a.account.id,
+              <span>{a.account.name}</span>,
+              <>
+                <b>{won(a.total)}</b>
+                <small class="rest">남은 {won(a.rest)}</small>
+              </>,
+            ),
+          )}
         </ul>
       </aside>
 

@@ -97,6 +97,9 @@ try {
   check((await page.locator(".pick").count()) === 2, "요약 줄 = 빠져나갈 돈 있는 계좌 2 (생활비 계좌는 없음)");
   check((await page.locator("section.acct").count()) === 0, "휴대폰은 처음엔 다 접혀 있다");
   check((await pick("대출·고지서").locator("b").innerText()) === "381,230원", "계좌 줄에 그 계좌 입금 필요 금액");
+  // 대출 이자 5일 320,000 · 전기 20일 61,230 중 아직 안 나간 것
+  const restWon = (now.getDate() < 5 ? 320000 : 0) + (now.getDate() < 20 ? 61230 : 0);
+  check((await pick("대출·고지서").locator(".rest").innerText()) === `남은 ${restWon.toLocaleString("ko-KR")}원`, "계좌 줄 금액 밑에 아직 안 나간 금액");
   await pick("대출·고지서").click();
   check((await pick("대출·고지서").getAttribute("aria-expanded")) === "true", "누른 줄은 열림 표시");
   check((await page.locator(".summary .unfold section.acct").count()) === 1, "누른 줄 바로 아래로 펼쳐진다");
